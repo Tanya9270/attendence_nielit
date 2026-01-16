@@ -255,13 +255,16 @@ export const api = {
       try {
         data = await response.json();
       } catch (e) {
-        const text = await response.text().catch(() => null);
-        return { ok: false, error: text || response.statusText || 'unexpected_response' };
+        const text = await response.text().catch(() => '');
+        const errMsg = text || response.statusText || `HTTP ${response.status}`;
+        console.error('createTeacher non-JSON response', response.status, errMsg);
+        return { ok: false, error: errMsg, status: response.status, raw: text };
       }
 
       if (!response.ok) {
-        // Ensure a consistent error shape
-        return data && data.error ? { ok: false, error: data.error } : { ok: false, error: data || response.statusText };
+        const errMsg = data && data.error ? data.error : (data || response.statusText || `HTTP ${response.status}`);
+        console.error('createTeacher error response', response.status, errMsg, data);
+        return { ok: false, error: errMsg, status: response.status, raw: data };
       }
 
       return data;
@@ -285,12 +288,16 @@ export const api = {
       try {
         data = await response.json();
       } catch (e) {
-        const text = await response.text().catch(() => null);
-        return { ok: false, error: text || response.statusText || 'unexpected_response' };
+        const text = await response.text().catch(() => '');
+        const errMsg = text || response.statusText || `HTTP ${response.status}`;
+        console.error('createStudent non-JSON response', response.status, errMsg);
+        return { ok: false, error: errMsg, status: response.status, raw: text };
       }
 
       if (!response.ok) {
-        return data && data.error ? { ok: false, error: data.error } : { ok: false, error: data || response.statusText };
+        const errMsg = data && data.error ? data.error : (data || response.statusText || `HTTP ${response.status}`);
+        console.error('createStudent error response', response.status, errMsg, data);
+        return { ok: false, error: errMsg, status: response.status, raw: data };
       }
 
       return data;
