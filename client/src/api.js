@@ -227,6 +227,50 @@ export const api = {
     return response.blob();
   },
 
+  async changePassword(token, oldPassword, newPassword) {
+    const response = await fetch(`${API_BASE_URL}/users/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ oldPassword, newPassword })
+    });
+    return response.json();
+  },
+
+  async createTeacher(token, username, password, courseCode = '', courseName = '') {
+    const response = await fetch(`${API_BASE_URL}/admin/teachers`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ username, password, course_code: courseCode, course_name: courseName })
+    });
+    return response.json();
+  },
+
+  async createStudent(token, rollNumber, name, courseCode = '', password = '') {
+    const response = await fetch(`${API_BASE_URL}/students`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ roll_number: rollNumber, name, course_code: courseCode, password })
+    });
+    return response.json();
+  },
+
+  // Get all teachers (admin)
+  async getTeachers(token) {
+    const response = await fetch(`${API_BASE_URL}/admin/teachers`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.json();
+  },
+
   // Get all courses
   async getCourses(token) {
     const response = await fetch(`${API_BASE_URL}/export/courses`, {

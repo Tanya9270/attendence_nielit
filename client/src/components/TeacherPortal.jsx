@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import QRCode from 'qrcode';
+import AdminPanel from './AdminPanel';
 
 export default function TeacherPortal() {
   const [activeTab, setActiveTab] = useState('qr');
@@ -25,6 +26,7 @@ export default function TeacherPortal() {
 
   const token = localStorage.getItem('token');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isAdmin = user.role === 'admin';
 
   const months = [
     { value: 1, label: 'January' },
@@ -405,6 +407,11 @@ export default function TeacherPortal() {
           </div>
           <div className="header-right">
             <span className="user-info">👨‍🏫 {user.username}</span>
+            {isAdmin && (
+              <button onClick={() => setActiveTab('admin')} className="btn btn-primary" style={{ marginRight: '10px', borderRadius: '6px' }}>
+                Admin
+              </button>
+            )}
             <button onClick={handleLogout} className="btn btn-secondary" style={{ borderRadius: '6px' }}>
               Logout
             </button>
@@ -480,6 +487,23 @@ export default function TeacherPortal() {
             >
               📊 Monthly Report
             </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setActiveTab('admin')}
+                  style={{
+                    padding: '15px 30px',
+                    border: 'none',
+                    background: activeTab === 'admin' ? 'linear-gradient(135deg, #0066B3 0%, #00A0E3 100%)' : 'transparent',
+                    color: activeTab === 'admin' ? 'white' : '#666',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    borderRadius: activeTab === 'admin' ? '8px 8px 0 0' : '0',
+                    transition: 'all 0.3s'
+                  }}
+                >
+                  🛠 Admin
+                </button>
+              )}
           </div>
 
           {activeTab === 'qr' && (
@@ -1193,6 +1217,11 @@ export default function TeacherPortal() {
                   Select filters and click Refresh to load monthly report
                 </div>
               )}
+            </div>
+          )}
+          {activeTab === 'admin' && isAdmin && (
+            <div style={{ padding: '20px' }}>
+              <AdminPanel token={token} />
             </div>
           )}
         </div>
