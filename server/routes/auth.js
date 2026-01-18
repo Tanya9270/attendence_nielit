@@ -132,6 +132,8 @@ router.post('/users/change-password', authenticateToken, async (req, res) => {
 router.post('/admin/teachers', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { username, password, course_code, course_name } = req.body;
+        console.log('Create teacher request by:', req.user && req.user.username, 'role:', req.user && req.user.role);
+        console.log('Request body:', req.body);
         if (!username || !password) return res.status(400).json({ ok: false, error: 'missing_fields' });
 
         // Check if user exists

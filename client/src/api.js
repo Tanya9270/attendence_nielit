@@ -3,11 +3,17 @@
 // For local: keep as '/api' (uses Vite proxy)
 
 // Set API base URL: use env, else production, else local proxy
-let API_BASE_URL = import.meta.env.VITE_API_URL || 'https://nielit-attendance.onrender.com';
+// Prefer explicit environment override. When not provided, use local proxy `/api` for dev.
+let API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
-// Normalize: ensure API_BASE_URL does not end with a slash, and always include the `/api` prefix.
-API_BASE_URL = API_BASE_URL.replace(/\/+$/, '');
-if (!API_BASE_URL.endsWith('/api')) API_BASE_URL = API_BASE_URL + '/api';
+if (API_BASE_URL) {
+  // Normalize: ensure API_BASE_URL does not end with a slash, and always include the `/api` prefix.
+  API_BASE_URL = API_BASE_URL.replace(/\/+$/, '');
+  if (!API_BASE_URL.endsWith('/api')) API_BASE_URL = API_BASE_URL + '/api';
+} else {
+  // Use Vite dev server proxy or same-origin API in production
+  API_BASE_URL = '/api';
+}
 
 if (!API_BASE_URL.startsWith('http') && !API_BASE_URL.startsWith('/api')) {
   console.warn('Warning: API_BASE_URL may be misconfigured:', API_BASE_URL);
