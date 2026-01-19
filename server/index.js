@@ -13,8 +13,16 @@ const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0'; // Bind to all network interfaces
 
 // Middleware
+// Allow configuring allowed origins via ALLOWED_ORIGINS (comma-separated)
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'https://nielitattendance.netlify.app').split(',').map(s => s.trim()).filter(Boolean);
+console.log('CORS allowed origins:', allowedOrigins);
 app.use(cors({
-    origin: true, // Allow all origins for development
+    origin: function(origin, callback) {
+        // Allow requests with no origin (e.g., curl, server-to-server)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
+        return callback(new Error('CORS policy: origin not allowed'));
+    },
     credentials: true
 }));
 app.use(express.json());

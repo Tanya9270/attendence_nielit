@@ -88,11 +88,11 @@ export default function AdminPanel({ token }) {
               <input type="password" value={tPassword} onChange={e=>setTPassword(e.target.value)} required />
             </div>
             <div className="form-group">
-              <label>Course Code (optional)</label>
+              <label>Course Code</label>
               <input value={tCourseCode} onChange={e=>setTCourseCode(e.target.value)} />
             </div>
             <div className="form-group">
-              <label>Course Name (optional)</label>
+              <label>Course Name</label>
               <input value={tCourseName} onChange={e=>setTCourseName(e.target.value)} />
             </div>
             <div className="form-group">
@@ -111,11 +111,11 @@ export default function AdminPanel({ token }) {
               <input value={sName} onChange={e=>setSName(e.target.value)} required />
             </div>
             <div className="form-group">
-              <label>Password (optional)</label>
+              <label>Password</label>
               <input type="password" value={sPassword} onChange={e=>setSPassword(e.target.value)} placeholder="Leave blank to use roll number" />
             </div>
             <div className="form-group">
-              <label>Course Code (optional)</label>
+              <label>Course Code</label>
               <input value={sCourse} onChange={e=>setSCourse(e.target.value)} />
             </div>
             <div className="form-group">
