@@ -78,7 +78,7 @@ router.get('/me/attendance-stats', authenticateToken, requireRole('student'), as
         
         // Get student info
         const studentResult = await db.query(
-            'SELECT s.id, s.roll_number, s.name, s.class, s.section, s.year FROM students s INNER JOIN users u ON s.user_id = u.id WHERE u.id = $1',
+            'SELECT s.id, s.roll_number, s.name, s.course_code FROM students s INNER JOIN users u ON s.user_id = u.id WHERE u.id = $1',
             [req.user.id]
         );
 
@@ -248,17 +248,14 @@ router.get('/', authenticateToken, requireRole('teacher', 'admin'), async (req, 
     try {
         const { class: className, section } = req.query;
         
-        let query = 'SELECT s.id, s.roll_number, s.name, s.class, s.section, s.year FROM students s ORDER BY s.roll_number';
+        let query = 'SELECT s.id, s.roll_number, s.name, s.course_code FROM students s ORDER BY s.roll_number';
         const params = [];
 
         if (className) {
-            query = 'SELECT s.id, s.roll_number, s.name, s.class, s.section, s.year FROM students s WHERE s.class = $1';
+            // The schema doesn't include `class`/`section`. Treat `class` query param as `course_code` for filtering.
+            query = 'SELECT s.id, s.roll_number, s.name, s.course_code FROM students s WHERE s.course_code = $1';
             params.push(className);
-            
-            if (section) {
-                query += ' AND s.section = $2';
-                params.push(section);
-            }
+            // `section` not supported by current schema; ignore if provided.
             query += ' ORDER BY s.roll_number';
         }
 
