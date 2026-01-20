@@ -5,10 +5,18 @@ const { Pool } = pkg;
 
 dotenv.config();
 
-const pool = new Pool({
+const poolConfig = {
   connectionString: process.env.DATABASE_URL,
-  // You can add more config here if needed (ssl, etc.)
-});
+};
+
+// If PGSSLMODE=require (e.g., Render Postgres), allow connecting to servers
+// that use self-signed certificates by disabling strict certificate validation.
+// This mirrors common libpq behavior for 'sslmode=require'.
+if ((process.env.PGSSLMODE || '').toLowerCase() === 'require') {
+  poolConfig.ssl = { rejectUnauthorized: false };
+}
+
+const pool = new Pool(poolConfig);
 
 const db = {
   async query(sql, params = []) {
