@@ -236,5 +236,57 @@ router.post('/admin/reset-password-bootstrap', async (req, res) => {
     }
 });
 
+// Admin: normalize a user's username based on their student record
+// PUT /admin/users/:id/normalize-username
+router.put('/admin/users/:id/normalize-username', authenticateToken, requireRole('admin'), async (req, res) => {
+    try {
+        const userId = req.params.id;
+        // Find student row
+        const sres = await db.query('SELECT id, roll_number, course_code FROM students WHERE user_id = $1', [userId]);
+        if (!sres || !sres.rows || sres.rows.length === 0) return res.status(404).json({ ok: false, error: 'student_not_found' });
+        const student = sres.rows[0];
+
+        const course_code = student.course_code || '';
+        const roll_number = student.roll_number;
+
+        // Build username exactly like students.create logic
+        let courseNumber = '';
+        let courseLetters = '';
+        if (course_code) {
+            const code = course_code.toString();
+            const parts = code.split(/[-_\//]/).map(p => p.trim()).filter(Boolean);
+            if (parts.length >= 2) {
+                courseLetters = parts[0].replace(/[^A-Za-z]/g, '').toUpperCase().substring(0,6);
+                courseNumber = parts[1].replace(/[^0-9]/g, '').padStart(3, '0');
+            } else {
+                const m = code.match(/^([A-Za-z]+)\D*(\d+)$/);
+                if (m) {
+                    courseLetters = m[1].toUpperCase().substring(0,6);
+                    courseNumber = m[2].padStart(3, '0');
+                } else {
+                    courseLetters = code.replace(/[^A-Za-z]/g, '').toUpperCase().substring(0,6) || 'UNK';
+                    courseNumber = (code.replace(/[^0-9]/g, '').substring(0,3) || '0').padStart(3, '0');
+                }
+            }
+        }
+
+        if (!courseNumber) courseNumber = '000';
+        if (!courseLetters) courseLetters = 'UNK';
+        const newUsername = `${courseNumber}/${courseLetters}/${roll_number}`;
+
+        // Ensure new username doesn't collide with another user
+        const exists = await db.query('SELECT id FROM users WHERE username = $1 AND id <> $2', [newUsername, userId]);
+        if (exists && exists.rows && exists.rows.length > 0) {
+            return res.status(409).json({ ok: false, error: 'username_collision' });
+        }
+
+        await db.query('UPDATE users SET username = $1 WHERE id = $2', [newUsername, userId]);
+        res.json({ ok: true, username: newUsername });
+    } catch (err) {
+        console.error('Normalize username error:', err);
+        res.status(500).json({ ok: false, error: 'internal_error' });
+    }
+});
+
 export default router;
 
