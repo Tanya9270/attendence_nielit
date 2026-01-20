@@ -18,6 +18,7 @@ export default function AdminPanel({ token }) {
   const [editingTeacherId, setEditingTeacherId] = useState(null);
   const [editingStudentId, setEditingStudentId] = useState(null);
   const [editingStudentUsername, setEditingStudentUsername] = useState('');
+  const [normalizingIds, setNormalizingIds] = useState([]);
 
   useEffect(() => {
     loadLists();
@@ -142,6 +143,25 @@ export default function AdminPanel({ token }) {
       setMsg('Error deleting student');
     }
     setTimeout(() => setMsg(''), 3000);
+  };
+
+  const normalizeStudent = async (id) => {
+    if (!confirm('Normalize this student username?')) return;
+    try {
+      setNormalizingIds(prev => [...prev, id]);
+      const res = await api.normalizeUsername(token, id);
+      if (res && res.ok) {
+        setMsgType('success'); setMsg('Username normalized');
+        loadStudents();
+      } else {
+        setMsgType('error'); setMsg(res && res.error ? res.error : 'Normalization failed');
+      }
+    } catch (err) {
+      setMsgType('error'); setMsg('Error normalizing username');
+    } finally {
+      setNormalizingIds(prev => prev.filter(x => x !== id));
+      setTimeout(() => setMsg(''), 3000);
+    }
   };
 
   const startEditTeacher = (t) => {
@@ -293,6 +313,9 @@ export default function AdminPanel({ token }) {
                   <div style={{display:'flex',gap:8,alignItems:'center'}}>
                     {s.username && <button className="btn" onClick={() => copyToClipboard(s.username)}>Copy</button>}
                     <button className="btn" onClick={() => startEditStudent(s)}>Edit</button>
+                    <button className="btn" onClick={() => normalizeStudent(s.id)} disabled={normalizingIds.includes(s.id)}>
+                      {normalizingIds.includes(s.id) ? 'Normalizing...' : 'Normalize'}
+                    </button>
                     <button className="btn btn-danger" onClick={() => deleteStudent(s.id)}>Delete</button>
                   </div>
                 </li>
