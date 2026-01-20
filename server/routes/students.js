@@ -289,15 +289,37 @@ router.post('/', authenticateToken, requireRole('teacher', 'admin'), async (req,
         }
 
         // Create user account for student (username = roll_number)
-        const defaultPassword = password || roll_number || 'changeme';
-        const hash = await bcrypt.hash(defaultPassword, 10);
-        const userRes = await db.query('INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id', [roll_number, hash, 'student']);
-        const userId = userRes.rows[0].id;
+        // Use a transaction to avoid partial inserts and check for existing username first.
+        const client = await db.connect();
+        try {
+            await client.query('BEGIN');
 
-        // Insert student record
-        await db.query('INSERT INTO students (user_id, roll_number, name, course_code) VALUES ($1, $2, $3, $4)', [userId, roll_number, name, course_code || null]);
+            const existing = await client.query('SELECT id FROM users WHERE username = $1', [roll_number]);
+            if (existing.rows && existing.rows.length > 0) {
+                await client.query('ROLLBACK');
+                return res.status(409).json({ ok: false, error: 'user_exists' });
+            }
 
-        res.json({ ok: true, userId });
+            const defaultPassword = password || roll_number || 'changeme';
+            const hash = await bcrypt.hash(defaultPassword, 10);
+            const userInsert = await client.query('INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id', [roll_number, hash, 'student']);
+            const userId = userInsert.rows[0].id;
+
+            await client.query('INSERT INTO students (user_id, roll_number, name, course_code) VALUES ($1, $2, $3, $4)', [userId, roll_number, name, course_code || null]);
+
+            await client.query('COMMIT');
+            res.json({ ok: true, userId });
+        } catch (txErr) {
+            try { await client.query('ROLLBACK'); } catch (e) { /* ignore */ }
+            console.error('Create student transaction error:', txErr);
+            // If unique constraint violation slipped through, return friendly error
+            if (txErr && txErr.code === '23505') {
+                return res.status(409).json({ ok: false, error: 'user_exists' });
+            }
+            res.status(500).json({ ok: false, error: 'internal_error' });
+        } finally {
+            client.release();
+        }
     } catch (err) {
         console.error('Create student error:', err);
         res.status(500).json({ ok: false, error: 'internal_error' });
