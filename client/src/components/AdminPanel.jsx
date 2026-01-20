@@ -14,6 +14,7 @@ export default function AdminPanel({ token }) {
   const [msgType, setMsgType] = useState('success');
   const [teachers, setTeachers] = useState([]);
   const [courses, setCourses] = useState([]);
+  const [students, setStudents] = useState([]);
 
   useEffect(() => {
     loadLists();
