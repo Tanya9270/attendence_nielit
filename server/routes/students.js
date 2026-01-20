@@ -292,32 +292,36 @@ router.post('/', authenticateToken, requireRole('teacher', 'admin'), async (req,
         try {
             await client.query('BEGIN');
 
-            // Determine course letters from courses table when possible
-            let courseLetters = 'UNK';
+            // Build username as <course_number>/<course_letters>/<roll_number>
+            // e.g. course_code 'JAI-001' -> username '001/JAI/1'
+            let courseNumber = '';
+            let courseLetters = '';
             if (course_code) {
-                const cRes = await client.query('SELECT course_name FROM courses WHERE course_code = $1', [course_code]);
-                if (cRes && cRes.rows && cRes.rows.length > 0) {
-                    const cname = (cRes.rows[0].course_name || '').toString().trim();
-                    if (cname.length > 0) {
-                        // If name is short and all letters, use it uppercased
-                        const alphaOnly = cname.replace(/[^a-zA-Z]/g, '');
-                        if (alphaOnly.length <= 6 && alphaOnly.length >= 1) {
-                            courseLetters = alphaOnly.toUpperCase();
-                        } else {
-                            // Build initials from words
-                            const parts = cname.split(/\s+/).filter(Boolean);
-                            let initials = parts.map(p => p[0]).join('').toUpperCase();
-                            if (!initials) initials = cname.substring(0,3).toUpperCase();
-                            courseLetters = initials.substring(0,6);
-                        }
-                    }
+                const code = course_code.toString();
+                // Try to split on dash or underscore
+                const parts = code.split(/[-_\/]/).map(p => p.trim()).filter(Boolean);
+                if (parts.length >= 2) {
+                    // typical format LETTERS-NUM
+                    courseLetters = parts[0].replace(/[^A-Za-z]/g, '').toUpperCase().substring(0,6);
+                    courseNumber = parts[1].replace(/[^0-9]/g, '');
                 } else {
-                    // Fallback to using course_code (letters only)
-                    courseLetters = (course_code || 'UNK').toString().replace(/[^a-zA-Z0-9]/g,'').toUpperCase().substring(0,6) || 'UNK';
+                    // fallback: extract trailing number and leading letters
+                    const m = code.match(/^([A-Za-z]+)\D*(\d+)$/);
+                    if (m) {
+                        courseLetters = m[1].toUpperCase().substring(0,6);
+                        courseNumber = m[2];
+                    } else {
+                        // as last resort, use sanitized code for letters and '00' for number
+                        courseLetters = code.replace(/[^A-Za-z]/g, '').toUpperCase().substring(0,6) || 'UNK';
+                        courseNumber = code.replace(/[^0-9]/g, '').substring(0,3) || '00';
+                    }
                 }
             }
 
-            const usernameBuilt = `${course_code || '00'}/${courseLetters}/${roll_number}`;
+            if (!courseNumber) courseNumber = '00';
+            if (!courseLetters) courseLetters = 'UNK';
+
+            const usernameBuilt = `${courseNumber}/${courseLetters}/${roll_number}`;
 
             const existing = await client.query('SELECT id FROM users WHERE username = $1', [usernameBuilt]);
             if (existing.rows && existing.rows.length > 0) {
