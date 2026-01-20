@@ -15,6 +15,8 @@ export default function AdminPanel({ token }) {
   const [teachers, setTeachers] = useState([]);
   const [courses, setCourses] = useState([]);
   const [students, setStudents] = useState([]);
+  const [editingTeacherId, setEditingTeacherId] = useState(null);
+  const [editingStudentId, setEditingStudentId] = useState(null);
 
   useEffect(() => {
     loadLists();
@@ -56,20 +58,31 @@ export default function AdminPanel({ token }) {
   const createTeacher = async (e) => {
     e.preventDefault();
     try {
-      const res = await api.createTeacher(token, tUsername, tPassword, tCourseCode, tCourseName);
-      console.log('createTeacher response:', res);
-      if (res.ok) {
-        setMsgType('success');
-        setMsg('Teacher created successfully');
-        setTUsername(''); setTPassword(''); setTCourseCode(''); setTCourseName('');
-        loadLists();
+      if (editingTeacherId) {
+        const res = await api.updateTeacher(token, editingTeacherId, { username: tUsername, password: tPassword || undefined, course_code: tCourseCode, course_name: tCourseName });
+        if (res && res.ok) {
+          setMsgType('success'); setMsg('Teacher updated');
+          setEditingTeacherId(null); setTUsername(''); setTPassword(''); setTCourseCode(''); setTCourseName('');
+          loadLists();
+        } else {
+          setMsgType('error'); setMsg(res.error || 'Failed to update teacher');
+        }
       } else {
-        setMsgType('error');
-        setMsg(res.error || 'Failed to create teacher');
+        const res = await api.createTeacher(token, tUsername, tPassword, tCourseCode, tCourseName);
+        console.log('createTeacher response:', res);
+        if (res.ok) {
+          setMsgType('success');
+          setMsg('Teacher created successfully');
+          setTUsername(''); setTPassword(''); setTCourseCode(''); setTCourseName('');
+          loadLists();
+        } else {
+          setMsgType('error');
+          setMsg(res.error || 'Failed to create teacher');
+        }
       }
     } catch (err) {
       setMsgType('error');
-      setMsg('Error creating teacher');
+      setMsg('Error creating/updating teacher');
     }
     setTimeout(() => setMsg(''), 4000);
   };
@@ -77,20 +90,31 @@ export default function AdminPanel({ token }) {
   const createStudent = async (e) => {
     e.preventDefault();
     try {
-      const res = await api.createStudent(token, sRoll, sName, sCourse, sPassword);
-      console.log('createStudent response:', res);
-      if (res.ok) {
-        setMsgType('success');
-        setMsg('Student created successfully');
-        setSRoll(''); setSName(''); setSCourse(''); setSPassword('');
-        loadStudents();
+      if (editingStudentId) {
+        const res = await api.updateStudent(token, editingStudentId, { roll_number: sRoll, name: sName, course_code: sCourse, password: sPassword || undefined });
+        if (res && res.ok) {
+          setMsgType('success'); setMsg('Student updated');
+          setEditingStudentId(null); setSRoll(''); setSName(''); setSCourse(''); setSPassword('');
+          loadStudents();
+        } else {
+          setMsgType('error'); setMsg(res.error || 'Failed to update student');
+        }
       } else {
-        setMsgType('error');
-        setMsg(res.error || 'Failed to create student');
+        const res = await api.createStudent(token, sRoll, sName, sCourse, sPassword);
+        console.log('createStudent response:', res);
+        if (res.ok) {
+          setMsgType('success');
+          setMsg('Student created successfully');
+          setSRoll(''); setSName(''); setSCourse(''); setSPassword('');
+          loadStudents();
+        } else {
+          setMsgType('error');
+          setMsg(res.error || 'Failed to create student');
+        }
       }
     } catch (err) {
       setMsgType('error');
-      setMsg('Error creating student');
+      setMsg('Error creating/updating student');
     }
     setTimeout(() => setMsg(''), 4000);
   };
@@ -119,14 +143,40 @@ export default function AdminPanel({ token }) {
     setTimeout(() => setMsg(''), 3000);
   };
 
+  const startEditTeacher = (t) => {
+    setEditingTeacherId(t.id);
+    setTUsername(t.username || '');
+    setTCourseCode(t.course_code || '');
+    setTCourseName(t.course_name || '');
+    setTPassword('');
+  };
+
+  const cancelEditTeacher = () => {
+    setEditingTeacherId(null);
+    setTUsername(''); setTPassword(''); setTCourseCode(''); setTCourseName('');
+  };
+
+  const startEditStudent = (s) => {
+    setEditingStudentId(s.id);
+    setSRoll(s.roll_number || '');
+    setSName(s.name || '');
+    setSCourse(s.course_code || '');
+    setSPassword('');
+  };
+
+  const cancelEditStudent = () => {
+    setEditingStudentId(null);
+    setSRoll(''); setSName(''); setSCourse(''); setSPassword('');
+  };
+
   return (
-    <div className="admin-panel container">
-      <div className="card">
+    <div className="admin-panel container" style={{padding:16}}>
+      <div className="card" style={{padding:20, borderRadius:8, boxShadow:'0 6px 18px rgba(0,0,0,0.06)'}}>
         <h2 style={{marginBottom:16}}>Admin Panel</h2>
 
-        <div className="columns">
-          <form onSubmit={createTeacher} className="col form-card">
-            <h3>Create Teacher</h3>
+        <div className="columns" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+          <form onSubmit={createTeacher} className="col form-card" style={{background:'#fff',padding:12,borderRadius:6}}>
+            <h3>{editingTeacherId ? 'Edit Teacher' : 'Create Teacher'}</h3>
             <div className="form-group">
               <label>Username</label>
               <input value={tUsername} onChange={e=>setTUsername(e.target.value)} required />
@@ -143,13 +193,14 @@ export default function AdminPanel({ token }) {
               <label>Course Name</label>
               <input value={tCourseName} onChange={e=>setTCourseName(e.target.value)} />
             </div>
-            <div className="form-group">
-              <button type="submit" className="btn btn-primary">Create Teacher</button>
+            <div className="form-group" style={{display:'flex',gap:8}}>
+              <button type="submit" className="btn btn-primary">{editingTeacherId ? 'Save' : 'Create Teacher'}</button>
+              {editingTeacherId && <button type="button" className="btn" onClick={cancelEditTeacher}>Cancel</button>}
             </div>
           </form>
 
-          <form onSubmit={createStudent} className="col form-card">
-            <h3>Create Student</h3>
+          <form onSubmit={createStudent} className="col form-card" style={{background:'#fff',padding:12,borderRadius:6}}>
+            <h3>{editingStudentId ? 'Edit Student' : 'Create Student'}</h3>
             <div className="form-group">
               <label>Roll Number</label>
               <input value={sRoll} onChange={e=>setSRoll(e.target.value)} required />
@@ -166,8 +217,9 @@ export default function AdminPanel({ token }) {
               <label>Course Code</label>
               <input value={sCourse} onChange={e=>setSCourse(e.target.value)} />
             </div>
-            <div className="form-group">
-              <button type="submit" className="btn btn-primary">Create Student</button>
+            <div className="form-group" style={{display:'flex',gap:8}}>
+              <button type="submit" className="btn btn-primary">{editingStudentId ? 'Save' : 'Create Student'}</button>
+              {editingStudentId && <button type="button" className="btn" onClick={cancelEditStudent}>Cancel</button>}
             </div>
           </form>
         </div>
@@ -185,9 +237,12 @@ export default function AdminPanel({ token }) {
           ) : (
             <ul>
               {teachers.map(t => (
-                <li key={t.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                  <span>{t.username} {t.last_login_at ? `- last login: ${new Date(t.last_login_at).toLocaleString()}` : ''}</span>
-                  <button className="btn btn-danger" onClick={() => deleteTeacher(t.id)}>Delete</button>
+                <li key={t.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid #f0f0f0'}}>
+                  <span style={{fontWeight:500}}>{t.username} {t.last_login_at ? `- last login: ${new Date(t.last_login_at).toLocaleString()}` : ''}</span>
+                  <div style={{display:'flex',gap:8}}>
+                    <button className="btn" onClick={() => startEditTeacher(t)}>Edit</button>
+                    <button className="btn btn-danger" onClick={() => deleteTeacher(t.id)}>Delete</button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -202,9 +257,12 @@ export default function AdminPanel({ token }) {
           ) : (
             <ul>
               {students.map(s => (
-                <li key={s.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                  <span>{s.roll_number} - {s.name} {s.course_code ? `(${s.course_code})` : ''}</span>
-                  <button className="btn btn-danger" onClick={() => deleteStudent(s.id)}>Delete</button>
+                <li key={s.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid #f6f6f6'}}>
+                  <span style={{fontWeight:500}}>{s.roll_number} - {s.name} {s.course_code ? `(${s.course_code})` : ''}</span>
+                  <div style={{display:'flex',gap:8}}>
+                    <button className="btn" onClick={() => startEditStudent(s)}>Edit</button>
+                    <button className="btn btn-danger" onClick={() => deleteStudent(s.id)}>Delete</button>
+                  </div>
                 </li>
               ))}
             </ul>

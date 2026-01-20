@@ -322,6 +322,21 @@ export const api = {
     return response.json();
   },
 
+  async updateTeacher(token, teacherId, payload) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/teachers/${teacherId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+      let data;
+      try { data = await response.json(); } catch (e) { data = { ok: response.ok, status: response.status }; }
+      return data;
+    } catch (err) {
+      return { ok: false, error: err.message || 'network_error' };
+    }
+  },
+
   async deleteTeacher(token, teacherId) {
     const response = await fetch(`${API_BASE_URL}/admin/teachers/${teacherId}`, {
       method: 'DELETE',
@@ -336,6 +351,20 @@ export const api = {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     return response.json();
+  },
+  async updateStudent(token, studentId, payload) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/students/${studentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+      let data;
+      try { data = await response.json(); } catch (e) { data = { ok: response.ok, status: response.status }; }
+      return data;
+    } catch (err) {
+      return { ok: false, error: err.message || 'network_error' };
+    }
   },
   async deleteCourse(token, courseCode) {
     const response = await fetch(`${API_BASE_URL}/export/courses/${encodeURIComponent(courseCode)}`, {
