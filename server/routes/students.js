@@ -248,12 +248,13 @@ router.get('/', authenticateToken, requireRole('teacher', 'admin'), async (req, 
     try {
         const { class: className, section } = req.query;
         
-        let query = 'SELECT s.id, s.roll_number, s.name, s.course_code FROM students s ORDER BY s.roll_number';
+        // Join with users to include generated username
+        let query = 'SELECT s.id, s.roll_number, s.name, s.course_code, u.username FROM students s INNER JOIN users u ON s.user_id = u.id ORDER BY s.roll_number';
         const params = [];
 
         if (className) {
             // The schema doesn't include `class`/`section`. Treat `class` query param as `course_code` for filtering.
-            query = 'SELECT s.id, s.roll_number, s.name, s.course_code FROM students s WHERE s.course_code = $1';
+            query = 'SELECT s.id, s.roll_number, s.name, s.course_code, u.username FROM students s INNER JOIN users u ON s.user_id = u.id WHERE s.course_code = $1';
             params.push(className);
             // `section` not supported by current schema; ignore if provided.
             query += ' ORDER BY s.roll_number';

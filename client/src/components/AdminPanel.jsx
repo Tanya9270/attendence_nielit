@@ -205,6 +205,12 @@ export default function AdminPanel({ token }) {
               <label>Roll Number</label>
               <input value={sRoll} onChange={e=>setSRoll(e.target.value)} required />
             </div>
+            {editingStudentId && (
+              <div className="form-group">
+                <label>Username</label>
+                <input value={''} readOnly disabled placeholder="(auto-generated)" />
+              </div>
+            )}
             <div className="form-group">
               <label>Name</label>
               <input value={sName} onChange={e=>setSName(e.target.value)} required />
@@ -258,7 +264,10 @@ export default function AdminPanel({ token }) {
             <ul>
               {students.map(s => (
                 <li key={s.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid #f6f6f6'}}>
-                  <span style={{fontWeight:500}}>{s.roll_number} - {s.name} {s.course_code ? `(${s.course_code})` : ''}</span>
+                  <div>
+                    <div style={{fontWeight:600}}>{s.roll_number} - {s.name}</div>
+                    <div style={{fontSize:12,color:'#666'}}>{s.course_code ? `${s.course_code}` : ''} {s.username ? ` • ${s.username}` : ''}</div>
+                  </div>
                   <div style={{display:'flex',gap:8}}>
                     <button className="btn" onClick={() => startEditStudent(s)}>Edit</button>
                     <button className="btn btn-danger" onClick={() => deleteStudent(s.id)}>Delete</button>
