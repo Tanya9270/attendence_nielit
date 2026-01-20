@@ -18,6 +18,7 @@ export default function AdminPanel({ token }) {
 
   useEffect(() => {
     loadLists();
+    loadStudents();
   }, []);
 
   const loadLists = async () => {
@@ -70,6 +71,7 @@ export default function AdminPanel({ token }) {
         setMsgType('success');
         setMsg('Student created successfully');
         setSRoll(''); setSName(''); setSCourse(''); setSPassword('');
+        loadStudents();
       } else {
         setMsgType('error');
         setMsg(res.error || 'Failed to create student');
