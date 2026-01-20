@@ -346,11 +346,30 @@ export const api = {
   },
 
   async deleteStudent(token, studentId) {
-    const response = await fetch(`${API_BASE_URL}/students/${studentId}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    return response.json();
+    try {
+      const response = await fetch(`${API_BASE_URL}/students/${studentId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      let data;
+      try { data = await response.json(); } catch (e) { data = { ok: response.ok, status: response.status }; }
+      return data;
+    } catch (err) {
+      return { ok: false, error: err.message || 'network_error' };
+    }
+  },
+  async normalizeUsername(token, userId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/normalize-username`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      let data;
+      try { data = await response.json(); } catch (e) { data = { ok: response.ok, status: response.status }; }
+      return data;
+    } catch (err) {
+      return { ok: false, error: err.message || 'network_error' };
+    }
   },
   async updateStudent(token, studentId, payload) {
     try {
