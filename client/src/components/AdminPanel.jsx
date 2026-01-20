@@ -17,6 +17,7 @@ export default function AdminPanel({ token }) {
   const [students, setStudents] = useState([]);
   const [editingTeacherId, setEditingTeacherId] = useState(null);
   const [editingStudentId, setEditingStudentId] = useState(null);
+  const [editingStudentUsername, setEditingStudentUsername] = useState('');
 
   useEffect(() => {
     loadLists();
@@ -162,11 +163,25 @@ export default function AdminPanel({ token }) {
     setSName(s.name || '');
     setSCourse(s.course_code || '');
     setSPassword('');
+    setEditingStudentUsername(s.username || '');
   };
 
   const cancelEditStudent = () => {
     setEditingStudentId(null);
     setSRoll(''); setSName(''); setSCourse(''); setSPassword('');
+    setEditingStudentUsername('');
+  };
+
+  const copyToClipboard = async (text) => {
+    try {
+      if (!text) return;
+      await navigator.clipboard.writeText(text);
+      setMsgType('success'); setMsg('Copied to clipboard');
+      setTimeout(() => setMsg(''), 2000);
+    } catch (err) {
+      setMsgType('error'); setMsg('Copy failed');
+      setTimeout(() => setMsg(''), 2000);
+    }
   };
 
   return (
@@ -206,9 +221,14 @@ export default function AdminPanel({ token }) {
               <input value={sRoll} onChange={e=>setSRoll(e.target.value)} required />
             </div>
             {editingStudentId && (
-              <div className="form-group">
-                <label>Username</label>
-                <input value={''} readOnly disabled placeholder="(auto-generated)" />
+              <div className="form-group" style={{display:'flex',gap:8,alignItems:'center'}}>
+                <div style={{flex:1}}>
+                  <label>Username</label>
+                  <input value={editingStudentUsername} readOnly disabled />
+                </div>
+                <div style={{alignSelf:'flex-end'}}>
+                  <button type="button" className="btn" onClick={() => copyToClipboard(editingStudentUsername)}>Copy</button>
+                </div>
               </div>
             )}
             <div className="form-group">
@@ -261,14 +281,17 @@ export default function AdminPanel({ token }) {
           {students.length === 0 ? (
             <div>No students loaded</div>
           ) : (
-            <ul>
+            <ul style={{listStyle:'none',paddingLeft:0,margin:0}}>
               {students.map(s => (
-                <li key={s.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid #f6f6f6'}}>
+                <li key={s.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 8px',borderBottom:'1px solid #f6f6f6'}}>
                   <div>
                     <div style={{fontWeight:600}}>{s.roll_number} - {s.name}</div>
-                    <div style={{fontSize:12,color:'#666'}}>{s.course_code ? `${s.course_code}` : ''} {s.username ? ` • ${s.username}` : ''}</div>
+                    <div style={{fontSize:12,color:'#666',marginTop:4}}>
+                      {s.course_code ? `${s.course_code}` : ''} {s.username ? ` • ${s.username}` : ''}
+                    </div>
                   </div>
-                  <div style={{display:'flex',gap:8}}>
+                  <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                    {s.username && <button className="btn" onClick={() => copyToClipboard(s.username)}>Copy</button>}
                     <button className="btn" onClick={() => startEditStudent(s)}>Edit</button>
                     <button className="btn btn-danger" onClick={() => deleteStudent(s.id)}>Delete</button>
                   </div>
