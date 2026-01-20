@@ -303,22 +303,22 @@ router.post('/', authenticateToken, requireRole('teacher', 'admin'), async (req,
                 if (parts.length >= 2) {
                     // typical format LETTERS-NUM
                     courseLetters = parts[0].replace(/[^A-Za-z]/g, '').toUpperCase().substring(0,6);
-                    courseNumber = parts[1].replace(/[^0-9]/g, '');
+                    courseNumber = parts[1].replace(/[^0-9]/g, '').padStart(3, '0');
                 } else {
                     // fallback: extract trailing number and leading letters
                     const m = code.match(/^([A-Za-z]+)\D*(\d+)$/);
                     if (m) {
                         courseLetters = m[1].toUpperCase().substring(0,6);
-                        courseNumber = m[2];
+                        courseNumber = m[2].padStart(3, '0');
                     } else {
                         // as last resort, use sanitized code for letters and '00' for number
                         courseLetters = code.replace(/[^A-Za-z]/g, '').toUpperCase().substring(0,6) || 'UNK';
-                        courseNumber = code.replace(/[^0-9]/g, '').substring(0,3) || '00';
+                        courseNumber = (code.replace(/[^0-9]/g, '').substring(0,3) || '0').padStart(3, '0');
                     }
                 }
             }
 
-            if (!courseNumber) courseNumber = '00';
+            if (!courseNumber) courseNumber = '000';
             if (!courseLetters) courseLetters = 'UNK';
 
             const usernameBuilt = `${courseNumber}/${courseLetters}/${roll_number}`;
