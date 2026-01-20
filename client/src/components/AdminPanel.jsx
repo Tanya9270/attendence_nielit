@@ -41,6 +41,18 @@ export default function AdminPanel({ token }) {
     }
   };
 
+  const deleteCourse = async (code) => {
+    if (!confirm('Delete this course? This will unset course for enrolled students.')) return;
+    try {
+      const res = await api.deleteCourse(token, code);
+      if (res && res.ok) loadLists();
+      else setMsg('Failed to delete course');
+    } catch (err) {
+      setMsg('Error deleting course');
+    }
+    setTimeout(() => setMsg(''), 3000);
+  };
+
   const createTeacher = async (e) => {
     e.preventDefault();
     try {
@@ -198,16 +210,24 @@ export default function AdminPanel({ token }) {
             </ul>
           )}
 
-          <h3 style={{marginTop:12}}>Courses</h3>
-          {courses.length === 0 ? (
-            <div>No courses found</div>
-          ) : (
-            <ul>
-              {courses.map(c => (
-                <li key={c.course_code}>{c.course_code} - {c.course_name} {c.teacher_name ? `(${c.teacher_name})` : ''}</li>
-              ))}
-            </ul>
-          )}
+          <div style={{ marginTop: 16 }}>
+            <h3>Courses</h3>
+            {courses.length === 0 ? (
+              <div>No courses found</div>
+            ) : (
+              <ul>
+                {courses.map(c => (
+                  <li key={c.course_code} style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                    <span>{c.course_code} - {c.course_name} {c.teacher_name ? `(${c.teacher_name})` : ''}</span>
+                    <div style={{display:'flex',gap:8}}>
+                      <button className="btn" onClick={() => { setTCourseCode(c.course_code); setTCourseName(c.course_name); }}>Edit</button>
+                      <button className="btn btn-danger" onClick={() => deleteCourse(c.course_code)}>Delete</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
     </div>

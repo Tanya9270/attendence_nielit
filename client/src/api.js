@@ -337,6 +337,13 @@ export const api = {
     });
     return response.json();
   },
+  async deleteCourse(token, courseCode) {
+    const response = await fetch(`${API_BASE_URL}/export/courses/${encodeURIComponent(courseCode)}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.json();
+  },
 
   // Get all courses
   async getCourses(token) {

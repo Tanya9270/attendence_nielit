@@ -718,4 +718,19 @@ router.get('/courses', authenticateToken, async (req, res) => {
     }
 });
 
+// Delete a course (admin only)
+// DELETE /courses/:course_code
+router.delete('/courses/:course_code', authenticateToken, requireRole('admin'), async (req, res) => {
+    try {
+        const courseCode = req.params.course_code;
+        // Delete course; students.course_code has ON DELETE SET NULL in schema
+        const delRes = await db.query('DELETE FROM courses WHERE course_code = $1 RETURNING course_code', [courseCode]);
+        if (!delRes.rows || delRes.rows.length === 0) return res.status(404).json({ ok: false, error: 'course_not_found' });
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('Delete course error:', err);
+        res.status(500).json({ ok: false, error: 'internal_error' });
+    }
+});
+
 export default router;
