@@ -15,6 +15,9 @@ export default function AdminPanel({ token }) {
   const [teachers, setTeachers] = useState([]);
   const [courses, setCourses] = useState([]);
   const [students, setStudents] = useState([]);
+  const [teacherQuery, setTeacherQuery] = useState('');
+  const [studentQuery, setStudentQuery] = useState('');
+  const [courseQuery, setCourseQuery] = useState('');
   const [editingTeacherId, setEditingTeacherId] = useState(null);
   const [editingStudentId, setEditingStudentId] = useState(null);
   const [editingStudentUsername, setEditingStudentUsername] = useState('');
@@ -278,67 +281,124 @@ export default function AdminPanel({ token }) {
 
         <div style={{ marginTop: 20 }}>
           <h3>Existing Teachers</h3>
-          {teachers.length === 0 ? (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+            <input placeholder="Search teachers..." value={teacherQuery} onChange={e => setTeacherQuery(e.target.value)} style={{padding:8,borderRadius:6,border:'1px solid #ddd',flex:1}} />
+            <button className="btn" onClick={loadLists}>Refresh</button>
+          </div>
+          {teachers.filter(t => (t.username || '').toLowerCase().includes(teacherQuery.toLowerCase())).length === 0 ? (
             <div>No teachers found</div>
           ) : (
-            <ul>
-              {teachers.map(t => (
-                <li key={t.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid #f0f0f0'}}>
-                  <span style={{fontWeight:500}}>{t.username} {t.last_login_at ? `- last login: ${new Date(t.last_login_at).toLocaleString()}` : ''}</span>
-                  <div style={{display:'flex',gap:8}}>
-                    <button className="btn" onClick={() => startEditTeacher(t)}>Edit</button>
-                    <button className="btn btn-danger" onClick={() => deleteTeacher(t.id)}>Delete</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <table>
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Last Login</th>
+                  <th>Course</th>
+                  <th style={{width:180}}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teachers.filter(t => (t.username || '').toLowerCase().includes(teacherQuery.toLowerCase())).map(t => (
+                  <tr key={t.id}>
+                    <td style={{fontWeight:600}}>{t.username}</td>
+                    <td>{t.last_login_at ? new Date(t.last_login_at).toLocaleString() : '-'}</td>
+                    <td>{t.course_code ? `${t.course_code} ${t.course_name ? '- ' + t.course_name : ''}` : '-'}</td>
+                    <td>
+                      <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+                        <button className="btn" onClick={() => startEditTeacher(t)}>Edit</button>
+                        <button className="btn btn-danger" onClick={() => deleteTeacher(t.id)}>Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
 
           <h3 style={{marginTop:12}}>Students</h3>
-          <div style={{ marginBottom: 8 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+            <input placeholder="Search students (roll, name, username)..." value={studentQuery} onChange={e => setStudentQuery(e.target.value)} style={{padding:8,borderRadius:6,border:'1px solid #ddd',flex:1}} />
             <button className="btn" onClick={loadStudents}>Load Students</button>
           </div>
-          {students.length === 0 ? (
-            <div>No students loaded</div>
+          {students.filter(s => {
+            const q = studentQuery.toLowerCase();
+            return (
+              !q || (s.roll_number || '').toLowerCase().includes(q) || (s.name || '').toLowerCase().includes(q) || (s.username || '').toLowerCase().includes(q)
+            );
+          }).length === 0 ? (
+            <div>No students found</div>
           ) : (
-            <ul style={{listStyle:'none',paddingLeft:0,margin:0}}>
-              {students.map(s => (
-                <li key={s.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 8px',borderBottom:'1px solid #f6f6f6'}}>
-                  <div>
-                    <div style={{fontWeight:600}}>{s.roll_number} - {s.name}</div>
-                    <div style={{fontSize:12,color:'#666',marginTop:4}}>
-                      {s.course_code ? `${s.course_code}` : ''} {s.username ? ` • ${s.username}` : ''}
-                    </div>
-                  </div>
-                  <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                    {s.username && <button className="btn" onClick={() => copyToClipboard(s.username)}>Copy</button>}
-                    <button className="btn" onClick={() => startEditStudent(s)}>Edit</button>
-                    <button className="btn" onClick={() => normalizeStudent(s.id)} disabled={normalizingIds.includes(s.id)}>
-                      {normalizingIds.includes(s.id) ? 'Normalizing...' : 'Normalize'}
-                    </button>
-                    <button className="btn btn-danger" onClick={() => deleteStudent(s.id)}>Delete</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <table>
+              <thead>
+                <tr>
+                  <th>Roll</th>
+                  <th>Name</th>
+                  <th>Course</th>
+                  <th>Username</th>
+                  <th style={{width:260}}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {students.filter(s => {
+                  const q = studentQuery.toLowerCase();
+                  return (
+                    !q || (s.roll_number || '').toLowerCase().includes(q) || (s.name || '').toLowerCase().includes(q) || (s.username || '').toLowerCase().includes(q)
+                  );
+                }).map(s => (
+                  <tr key={s.id}>
+                    <td style={{fontWeight:600}}>{s.roll_number}</td>
+                    <td>{s.name}</td>
+                    <td>{s.course_code || '-'}</td>
+                    <td>{s.username || '-'}</td>
+                    <td>
+                      <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+                        {s.username && <button className="btn" onClick={() => copyToClipboard(s.username)}>Copy</button>}
+                        <button className="btn" onClick={() => startEditStudent(s)}>Edit</button>
+                        <button className="btn" onClick={() => normalizeStudent(s.id)} disabled={normalizingIds.includes(s.id)}>
+                          {normalizingIds.includes(s.id) ? 'Normalizing...' : 'Normalize'}
+                        </button>
+                        <button className="btn btn-danger" onClick={() => deleteStudent(s.id)}>Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
 
           <div style={{ marginTop: 16 }}>
             <h3>Courses</h3>
-            {courses.length === 0 ? (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+              <input placeholder="Search courses..." value={courseQuery} onChange={e => setCourseQuery(e.target.value)} style={{padding:8,borderRadius:6,border:'1px solid #ddd',flex:1}} />
+            </div>
+            {courses.filter(c => (c.course_code || '').toLowerCase().includes(courseQuery.toLowerCase()) || (c.course_name || '').toLowerCase().includes(courseQuery.toLowerCase())).length === 0 ? (
               <div>No courses found</div>
             ) : (
-              <ul>
-                {courses.map(c => (
-                  <li key={c.course_code} style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                    <span>{c.course_code} - {c.course_name} {c.teacher_name ? `(${c.teacher_name})` : ''}</span>
-                    <div style={{display:'flex',gap:8}}>
-                      <button className="btn" onClick={() => { setTCourseCode(c.course_code); setTCourseName(c.course_name); }}>Edit</button>
-                      <button className="btn btn-danger" onClick={() => deleteCourse(c.course_code)}>Delete</button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Course Code</th>
+                    <th>Course Name</th>
+                    <th>Teacher</th>
+                    <th style={{width:180}}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {courses.filter(c => (c.course_code || '').toLowerCase().includes(courseQuery.toLowerCase()) || (c.course_name || '').toLowerCase().includes(courseQuery.toLowerCase())).map(c => (
+                    <tr key={c.course_code}>
+                      <td style={{fontWeight:600}}>{c.course_code}</td>
+                      <td>{c.course_name}</td>
+                      <td>{c.teacher_name || '-'}</td>
+                      <td>
+                        <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+                          <button className="btn" onClick={() => { setTCourseCode(c.course_code); setTCourseName(c.course_name); }}>Edit</button>
+                          <button className="btn btn-danger" onClick={() => deleteCourse(c.course_code)}>Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         </div>

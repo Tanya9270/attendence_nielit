@@ -163,6 +163,7 @@ export default function StudentPortal() {
       setMessage({ type: 'info', text: 'Marking attendance...' });
       
       const response = await api.markMyAttendance(token, qrPayload);
+      console.log('markMyAttendance response:', response);
       
       if (response.ok) {
         setAttendanceMarked(true);

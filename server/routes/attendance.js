@@ -44,7 +44,7 @@ router.post('/scan', authenticateToken, requireRole('teacher', 'admin'), async (
             const auditId = `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
             const auditDate = new Date(server_scan_time.toISOString().split('T')[0] + 'T00:00:00.000Z');
             await db.query(
-                'INSERT INTO attendance_audit (id, roll_number, [date], qr_generation_ts, server_scan_time, scanner_id, result, reason, delta_seconds, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+                'INSERT INTO attendance_audit (id, roll_number, "date", qr_generation_ts, server_scan_time, scanner_id, result, reason, delta_seconds, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
                 [auditId, roll_number, auditDate, qr_generation_ts,
                  server_scan_time, req.user.id, 'student_not_found', 'Roll number not found in database', delta_seconds, server_scan_time]
             );
@@ -60,7 +60,7 @@ router.post('/scan', authenticateToken, requireRole('teacher', 'admin'), async (
             const auditId = `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
             const auditDate = new Date(server_scan_time.toISOString().split('T')[0] + 'T00:00:00.000Z');
             await db.query(
-                'INSERT INTO attendance_audit (id, student_id, roll_number, [date], qr_generation_ts, server_scan_time, scanner_id, result, reason, delta_seconds, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+                'INSERT INTO attendance_audit (id, student_id, roll_number, "date", qr_generation_ts, server_scan_time, scanner_id, result, reason, delta_seconds, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
                 [auditId, student.id, roll_number, auditDate,
                  qr_generation_ts, server_scan_time, req.user.id, 'timestamp_out_of_range',
                  `Time difference ${delta_seconds.toFixed(1)}s exceeds 15s limit`, delta_seconds, server_scan_time]
@@ -81,7 +81,7 @@ router.post('/scan', authenticateToken, requireRole('teacher', 'admin'), async (
         // Check if attendance already exists for today
         // Use date comparison function to handle date-only comparison
         const existingAttendance = await db.query(
-            'SELECT id, scan_time, finalized FROM attendance WHERE student_id = $1 AND DateValue([date]) = DateValue($2)',
+            'SELECT id, scan_time, finalized FROM attendance WHERE student_id = $1 AND DATE("date") = DATE($2)',
             [student.id, todayDate]
         );
 
@@ -93,7 +93,7 @@ router.post('/scan', authenticateToken, requireRole('teacher', 'admin'), async (
             // Log audit entry
             const auditId = `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
             await db.query(
-                'INSERT INTO attendance_audit (id, student_id, roll_number, [date], qr_generation_ts, server_scan_time, scanner_id, result, reason, delta_seconds, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+                'INSERT INTO attendance_audit (id, student_id, roll_number, "date", qr_generation_ts, server_scan_time, scanner_id, result, reason, delta_seconds, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
                 [auditId, student.id, roll_number, todayDate, qr_generation_ts, server_scan_time,
                  req.user.id, 'duplicate', 'Attendance already marked for today', delta_seconds, server_scan_time]
             );
@@ -108,14 +108,14 @@ router.post('/scan', authenticateToken, requireRole('teacher', 'admin'), async (
         // Insert new attendance record
         const attendanceId = `att-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         await db.query(
-            'INSERT INTO attendance (id, student_id, [date], status, scan_time, scanner_id, finalized, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+            'INSERT INTO attendance (id, student_id, "date", status, scan_time, scanner_id, finalized, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
             [attendanceId, student.id, todayDate, 'present', server_scan_time, req.user.id, 0, server_scan_time, server_scan_time]
         );
 
         // Log successful audit entry
         const auditId = `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         await db.query(
-            'INSERT INTO attendance_audit (id, student_id, roll_number, [date], qr_generation_ts, server_scan_time, scanner_id, result, reason, delta_seconds, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+            'INSERT INTO attendance_audit (id, student_id, roll_number, "date", qr_generation_ts, server_scan_time, scanner_id, result, reason, delta_seconds, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
             [auditId, student.id, roll_number, todayDate, qr_generation_ts, server_scan_time,
              req.user.id, 'accepted', 'Attendance marked successfully', delta_seconds, server_scan_time]
         );
@@ -178,7 +178,7 @@ router.get('/daily', authenticateToken, requireRole('teacher', 'admin'), async (
         // Create a Date object at midnight for comparison
         const dateObj = new Date(targetDate + 'T00:00:00.000Z');
         const attendanceResult = await db.query(
-            'SELECT student_id, status, scan_time, finalized FROM attendance WHERE [date] = $1',
+            'SELECT student_id, status, scan_time, finalized FROM attendance WHERE DATE("date") = DATE($1)',
             [dateObj]
         );
         
@@ -307,7 +307,7 @@ router.get('/monthly', authenticateToken, requireRole('teacher', 'admin'), async
         
         // Get all attendance records for the month
         const attendanceResult = await db.query(
-            'SELECT student_id, [date], status, scan_time FROM attendance WHERE [date] >= $1 AND [date] <= $2',
+            'SELECT student_id, "date", status, scan_time FROM attendance WHERE DATE("date") >= DATE($1) AND DATE("date") <= DATE($2)',
             [startDate, endDate]
         );
         
@@ -427,7 +427,7 @@ router.post('/finalize', authenticateToken, requireRole('teacher', 'admin'), asy
         const { date, class: className, section } = req.body;
         const targetDate = date || new Date().toISOString().split('T')[0];
 
-        let query = 'UPDATE attendance SET finalized = 1 WHERE [date] = $1';
+        let query = 'UPDATE attendance SET finalized = 1 WHERE DATE("date") = DATE($1)';
         const dateObj = new Date(targetDate + 'T00:00:00.000Z');
         const params = [dateObj];
 
@@ -480,7 +480,7 @@ router.get('/export', authenticateToken, requireRole('teacher', 'admin'), async 
         // Then get attendance records for the date
         const dateObj = new Date(targetDate + 'T00:00:00.000Z');
         const attendanceResult = await db.query(
-            'SELECT student_id, status, scan_time FROM attendance WHERE [date] = $1',
+            'SELECT student_id, status, scan_time FROM attendance WHERE DATE("date") = DATE($1)',
             [dateObj]
         );
         
@@ -604,7 +604,7 @@ router.post('/mark-self', authenticateToken, requireRole('student'), async (req,
             const auditId = `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
             const auditDate = new Date(server_scan_time.toISOString().split('T')[0] + 'T00:00:00.000Z');
             await db.query(
-                'INSERT INTO attendance_audit (id, student_id, roll_number, [date], qr_generation_ts, server_scan_time, scanner_id, result, reason, delta_seconds, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+                'INSERT INTO attendance_audit (id, student_id, roll_number, "date", qr_generation_ts, server_scan_time, scanner_id, result, reason, delta_seconds, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
                 [auditId, student.id, student.roll_number, auditDate,
                  qr_generation_ts, server_scan_time, teacher_id, 'timestamp_out_of_range',
                  `Time difference ${delta_seconds.toFixed(1)}s exceeds 15s limit`, delta_seconds, server_scan_time]
@@ -622,7 +622,7 @@ router.post('/mark-self', authenticateToken, requireRole('student'), async (req,
 
         // Check if attendance already exists for today
         const existingAttendance = await db.query(
-            'SELECT id, scan_time, finalized FROM attendance WHERE student_id = $1 AND DateValue([date]) = DateValue($2)',
+            'SELECT id, scan_time, finalized FROM attendance WHERE student_id = $1 AND DATE("date") = DATE($2)',
             [student.id, todayDate]
         );
 
@@ -639,14 +639,14 @@ router.post('/mark-self', authenticateToken, requireRole('student'), async (req,
         // Insert new attendance record
         const attendanceId = `att-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         await db.query(
-            'INSERT INTO attendance (id, student_id, [date], status, scan_time, scanner_id, finalized, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+            'INSERT INTO attendance (id, student_id, "date", status, scan_time, scanner_id, finalized, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
             [attendanceId, student.id, todayDate, 'present', server_scan_time, teacher_id, 0, server_scan_time, server_scan_time]
         );
 
         // Log successful audit entry
         const auditId = `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         await db.query(
-            'INSERT INTO attendance_audit (id, student_id, roll_number, [date], qr_generation_ts, server_scan_time, scanner_id, result, reason, delta_seconds, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+            'INSERT INTO attendance_audit (id, student_id, roll_number, "date", qr_generation_ts, server_scan_time, scanner_id, result, reason, delta_seconds, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
             [auditId, student.id, student.roll_number, todayDate, qr_generation_ts, server_scan_time,
              teacher_id, 'accepted', 'Self-attendance marked successfully', delta_seconds, server_scan_time]
         );
