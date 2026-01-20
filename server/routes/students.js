@@ -323,4 +323,23 @@ router.post('/', authenticateToken, requireRole('teacher', 'admin'), async (req,
     }
 });
 
+// Admin: delete a student by student id
+// DELETE /students/:id
+router.delete('/:id', authenticateToken, requireRole('admin'), async (req, res) => {
+    try {
+        const studentId = req.params.id;
+        const sres = await db.query('SELECT user_id FROM students WHERE id = $1', [studentId]);
+        if (!sres || !sres.rows || sres.rows.length === 0) return res.status(404).json({ ok: false, error: 'student_not_found' });
+        const userId = sres.rows[0].user_id;
+
+        // Delete the user; students row will be removed via cascade
+        await db.query('DELETE FROM users WHERE id = $1', [userId]);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('Delete student error:', err);
+        res.status(500).json({ ok: false, error: 'internal_error' });
+    }
+});
+
 export default router;
+

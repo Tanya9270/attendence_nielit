@@ -322,6 +322,22 @@ export const api = {
     return response.json();
   },
 
+  async deleteTeacher(token, teacherId) {
+    const response = await fetch(`${API_BASE_URL}/admin/teachers/${teacherId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.json();
+  },
+
+  async deleteStudent(token, studentId) {
+    const response = await fetch(`${API_BASE_URL}/students/${studentId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.json();
+  },
+
   // Get all courses
   async getCourses(token) {
     const response = await fetch(`${API_BASE_URL}/export/courses`, {

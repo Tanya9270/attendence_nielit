@@ -87,6 +87,31 @@ router.get('/admin/teachers', authenticateToken, requireRole('admin'), async (re
     }
 });
 
+// Admin: delete a teacher by user id
+// DELETE /admin/teachers/:id
+router.delete('/admin/teachers/:id', authenticateToken, requireRole('admin'), async (req, res) => {
+    try {
+        const teacherId = req.params.id;
+        // Ensure the user exists and is a teacher
+        const ures = await db.query('SELECT username, role FROM users WHERE id = $1', [teacherId]);
+        if (!ures || !ures.rows || ures.rows.length === 0) return res.status(404).json({ ok: false, error: 'user_not_found' });
+        const user = ures.rows[0];
+        if (user.role !== 'teacher') return res.status(400).json({ ok: false, error: 'not_a_teacher' });
+
+        // Remove teacher assignment from courses (best-effort)
+        if (user.username) {
+            await db.query('UPDATE courses SET teacher_name = NULL WHERE teacher_name = $1', [user.username]);
+        }
+
+        // Delete user (will cascade any dependent rows)
+        await db.query('DELETE FROM users WHERE id = $1', [teacherId]);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('Delete teacher error:', err);
+        res.status(500).json({ ok: false, error: 'internal_error' });
+    }
+});
+
 // Get server time (for client sync)
 router.get('/server-time', (req, res) => {
     const now = new Date();
@@ -167,3 +192,4 @@ router.post('/admin/teachers', authenticateToken, requireRole('admin'), async (r
 });
 
 export default router;
+
