@@ -285,13 +285,40 @@ router.post('/', authenticateToken, requireRole('teacher', 'admin'), async (req,
             }
         }
 
-        // Create user account for student (username = roll_number)
-        // Use a transaction to avoid partial inserts and check for existing username first.
+        // Create user account for student.
+        // Username format: <course_code>/<course_letters>/<roll_number>
         const client = await db.connect();
         try {
             await client.query('BEGIN');
 
-            const existing = await client.query('SELECT id FROM users WHERE username = $1', [roll_number]);
+            // Determine course letters from courses table when possible
+            let courseLetters = 'UNK';
+            if (course_code) {
+                const cRes = await client.query('SELECT course_name FROM courses WHERE course_code = $1', [course_code]);
+                if (cRes && cRes.rows && cRes.rows.length > 0) {
+                    const cname = (cRes.rows[0].course_name || '').toString().trim();
+                    if (cname.length > 0) {
+                        // If name is short and all letters, use it uppercased
+                        const alphaOnly = cname.replace(/[^a-zA-Z]/g, '');
+                        if (alphaOnly.length <= 6 && alphaOnly.length >= 1) {
+                            courseLetters = alphaOnly.toUpperCase();
+                        } else {
+                            // Build initials from words
+                            const parts = cname.split(/\s+/).filter(Boolean);
+                            let initials = parts.map(p => p[0]).join('').toUpperCase();
+                            if (!initials) initials = cname.substring(0,3).toUpperCase();
+                            courseLetters = initials.substring(0,6);
+                        }
+                    }
+                } else {
+                    // Fallback to using course_code (letters only)
+                    courseLetters = (course_code || 'UNK').toString().replace(/[^a-zA-Z0-9]/g,'').toUpperCase().substring(0,6) || 'UNK';
+                }
+            }
+
+            const usernameBuilt = `${course_code || '00'}/${courseLetters}/${roll_number}`;
+
+            const existing = await client.query('SELECT id FROM users WHERE username = $1', [usernameBuilt]);
             if (existing.rows && existing.rows.length > 0) {
                 await client.query('ROLLBACK');
                 return res.status(409).json({ ok: false, error: 'user_exists' });
@@ -299,13 +326,13 @@ router.post('/', authenticateToken, requireRole('teacher', 'admin'), async (req,
 
             const defaultPassword = password || roll_number || 'changeme';
             const hash = await bcrypt.hash(defaultPassword, 10);
-            const userInsert = await client.query('INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id', [roll_number, hash, 'student']);
+            const userInsert = await client.query('INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id', [usernameBuilt, hash, 'student']);
             const userId = userInsert.rows[0].id;
 
             await client.query('INSERT INTO students (user_id, roll_number, name, course_code) VALUES ($1, $2, $3, $4)', [userId, roll_number, name, course_code || null]);
 
             await client.query('COMMIT');
-            res.json({ ok: true, userId });
+            res.json({ ok: true, userId, username: usernameBuilt });
         } catch (txErr) {
             try { await client.query('ROLLBACK'); } catch (e) { /* ignore */ }
             console.error('Create student transaction error:', txErr);
