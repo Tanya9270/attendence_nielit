@@ -191,5 +191,50 @@ router.post('/admin/teachers', authenticateToken, requireRole('admin'), async (r
     }
 });
 
+// Admin: update a user's password by user id
+// PUT /admin/users/:id/password
+router.put('/admin/users/:id/password', authenticateToken, requireRole('admin'), async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const { password } = req.body;
+        if (!password) return res.status(400).json({ ok: false, error: 'missing_password' });
+
+        // Ensure user exists
+        const ures = await db.query('SELECT id FROM users WHERE id = $1', [userId]);
+        if (!ures || !ures.rows || ures.rows.length === 0) return res.status(404).json({ ok: false, error: 'user_not_found' });
+
+        const hash = await bcrypt.hash(password, 10);
+        await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, userId]);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('Admin reset password error:', err);
+        res.status(500).json({ ok: false, error: 'internal_error' });
+    }
+});
+
+// Bootstrap password reset (useful when admin cannot login).
+// POST /admin/reset-password-bootstrap
+// Requires header 'x-bootstrap-key' equal to process.env.BOOTSTRAP_KEY and body { username, password }
+router.post('/admin/reset-password-bootstrap', async (req, res) => {
+    try {
+        const key = req.headers['x-bootstrap-key'] || req.query.key;
+        if (!process.env.BOOTSTRAP_KEY || !key || key !== process.env.BOOTSTRAP_KEY) {
+            return res.status(403).json({ ok: false, error: 'forbidden' });
+        }
+        const { username, password } = req.body;
+        if (!username || !password) return res.status(400).json({ ok: false, error: 'missing_fields' });
+
+        const ures = await db.query('SELECT id FROM users WHERE username = $1', [username]);
+        if (!ures || !ures.rows || ures.rows.length === 0) return res.status(404).json({ ok: false, error: 'user_not_found' });
+        const userId = ures.rows[0].id;
+        const hash = await bcrypt.hash(password, 10);
+        await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, userId]);
+        res.json({ ok: true, userId });
+    } catch (err) {
+        console.error('Bootstrap reset error:', err);
+        res.status(500).json({ ok: false, error: 'internal_error' });
+    }
+});
+
 export default router;
 
