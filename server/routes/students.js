@@ -89,17 +89,17 @@ router.get('/me/attendance-stats', authenticateToken, requireRole('student'), as
         const student = studentResult.rows[0];
         
         // Get attendance records - filtered by month if specified
-        let attendanceQuery = 'SELECT [date], status, scan_time FROM attendance WHERE student_id = $1';
+        let attendanceQuery = 'SELECT "date", status, scan_time FROM attendance WHERE student_id = $1';
         const queryParams = [student.id];
         
         if (targetMonth) {
             const startDate = new Date(targetYear, targetMonth - 1, 1);
             const endDate = new Date(targetYear, targetMonth, 0);
-            attendanceQuery += ' AND [date] >= $2 AND [date] <= $3';
+            attendanceQuery += ' AND DATE("date") >= DATE($2) AND DATE("date") <= DATE($3)';
             queryParams.push(startDate, endDate);
         }
         
-        attendanceQuery += ' ORDER BY [date] DESC';
+        attendanceQuery += ' ORDER BY "date" DESC';
         
         const attendanceResult = await db.query(attendanceQuery, queryParams);
         const attendanceRecords = attendanceResult.rows;

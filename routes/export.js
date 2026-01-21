@@ -86,7 +86,7 @@ router.get('/daily/pdf', authenticateToken, requireRole('teacher', 'admin'), asy
         // Get attendance for the date
         const dateObj = new Date(targetDate + 'T00:00:00.000Z');
         const attendanceResult = await db.query(
-            'SELECT student_id, status, scan_time FROM attendance WHERE [date] = $1',
+            'SELECT student_id, status, scan_time FROM attendance WHERE DATE("date") = DATE($1)',
             [dateObj]
         );
         
@@ -283,7 +283,7 @@ router.get('/daily/csv', authenticateToken, requireRole('teacher', 'admin'), asy
         
         const dateObj = new Date(targetDate + 'T00:00:00.000Z');
         const attendanceResult = await db.query(
-            'SELECT student_id, status, scan_time FROM attendance WHERE [date] = $1',
+            'SELECT student_id, status, scan_time FROM attendance WHERE DATE("date") = DATE($1)',
             [dateObj]
         );
         
@@ -362,7 +362,7 @@ router.get('/monthly/pdf', authenticateToken, requireRole('teacher', 'admin'), a
         
         // Get attendance for the month
         const attendanceResult = await db.query(
-            'SELECT student_id, [date], status, scan_time FROM attendance WHERE [date] >= $1 AND [date] <= $2',
+            'SELECT student_id, "date", status, scan_time FROM attendance WHERE DATE("date") >= DATE($1) AND DATE("date") <= DATE($2)',
             [startDate, endDate]
         );
         
@@ -631,7 +631,7 @@ router.get('/monthly/csv', authenticateToken, requireRole('teacher', 'admin'), a
         
         // Get attendance for the month
         const attendanceResult = await db.query(
-            'SELECT student_id, [date], status FROM attendance WHERE [date] >= $1 AND [date] <= $2',
+            'SELECT student_id, "date", status FROM attendance WHERE DATE("date") >= DATE($1) AND DATE("date") <= DATE($2)',
             [startDate, endDate]
         );
         
