@@ -177,16 +177,19 @@ router.post('/admin/teachers', authenticateToken, requireRole('admin'), async (r
 
         // Check if user exists
         const existing = await db.query('SELECT id FROM users WHERE username = $1', [username]);
+        let teacherId;
         if (existing && existing.rows && existing.rows.length > 0) {
-            return res.status(409).json({ ok: false, error: 'user_exists' });
+            // User already exists: attach course(s) to existing teacher instead of creating duplicate
+            teacherId = existing.rows[0].id;
+            console.log('Teacher already exists, will attach courses to user id', teacherId);
+        } else {
+            const hash = await bcrypt.hash(password, 10);
+            const insertRes = await db.query(
+                'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id',
+                [username, hash, 'teacher']
+            );
+            teacherId = insertRes.rows[0].id;
         }
-
-        const hash = await bcrypt.hash(password, 10);
-        const insertRes = await db.query(
-            'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id',
-            [username, hash, 'teacher']
-        );
-        const teacherId = insertRes.rows[0].id;
 
         // Normalize course codes (accept single or multiple)
         const codes = normalizeCourseCodes(course_codes || course_code);
@@ -197,14 +200,14 @@ router.post('/admin/teachers', authenticateToken, requireRole('admin'), async (r
             if (!courseRes || courseRes.rows.length === 0) {
                 await db.query('INSERT INTO courses (course_code, course_name, teacher_name) VALUES ($1, $2, $3)', [cc, course_name || cc, username]);
             } else {
-                await db.query('UPDATE courses SET teacher_name = $1, course_name = COALESCE($2, course_name) WHERE course_code = $3', [username, course_name, cc]);
+                    await db.query('UPDATE courses SET teacher_name = $1, course_name = COALESCE($2, course_name) WHERE course_code = $3', [username, course_name, cc]);
             }
 
-            // Insert into teacher_courses join table
-            await db.query('INSERT INTO teacher_courses (user_id, course_code) VALUES ($1, $2) ON CONFLICT DO NOTHING', [teacherId, cc]);
+                // Insert into teacher_courses join table (avoid duplicates)
+                await db.query('INSERT INTO teacher_courses (user_id, course_code) VALUES ($1, $2) ON CONFLICT DO NOTHING', [teacherId, cc]);
         }
 
-        res.json({ ok: true, teacherId });
+            res.json({ ok: true, teacherId, attached: true });
     } catch (err) {
         console.error('Create teacher error:', err);
         res.status(500).json({ ok: false, error: 'internal_error' });

@@ -77,7 +77,8 @@ export default function AdminPanel({ token }) {
           setMsgType('error'); setMsg(res.error || 'Failed to update teacher');
         }
       } else {
-        const res = await api.createTeacher(token, tUsername, tPassword, tCourseCodes, tCourseName);
+        // send single course code (first selected or empty)
+        const res = await api.createTeacher(token, tUsername, tPassword, (tCourseCodes && tCourseCodes[0]) || tCourseCode || '', tCourseName);
         console.log('createTeacher response:', res);
         if (res.ok) {
           setMsgType('success');
@@ -233,28 +234,17 @@ export default function AdminPanel({ token }) {
             <div className="form-group">
               <label>Course Codes (select multiple)</label>
               <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                  {(tCourseCodes || []).map(cc => (
-                    <div key={cc} style={{background:'#eef',padding:'6px 8px',borderRadius:6,display:'inline-flex',alignItems:'center',gap:8}}>
-                      <span style={{fontWeight:600}}>{cc}</span>
-                      <button type="button" className="btn" onClick={() => setTCourseCodes(prev => prev.filter(x => x !== cc))}>×</button>
-                    </div>
-                  ))}
-                </div>
-                <div style={{display:'flex',gap:8}}>
-                  <select value={''} onChange={e => {
-                    const v = e.target.value; if (!v) return; if (!tCourseCodes.includes(v)) setTCourseCodes(prev => [...prev, v]);
-                    e.target.value = '';
-                  }} style={{flex:1}}>
-                    <option value="">-- add from existing courses --</option>
-                    {courses.map(c => (
-                      <option key={c.course_code} value={c.course_code}>{c.course_code} {c.course_name ? '- ' + c.course_name : ''}</option>
-                    ))}
-                  </select>
-                  <input placeholder="Add new code (press Add or Enter)" value={tNewCourseInput} onChange={e=>setTNewCourseInput(e.target.value)} onKeyDown={e => {
-                    if (e.key === 'Enter') { e.preventDefault(); const v = (tNewCourseInput||'').trim(); if (!v) return; if (!tCourseCodes.includes(v)) setTCourseCodes(prev=>[...prev, v]); setTNewCourseInput(''); }
-                  }} />
-                  <button type="button" className="btn" onClick={() => { const v = (tNewCourseInput||'').trim(); if (!v) return; if (!tCourseCodes.includes(v)) setTCourseCodes(prev=>[...prev, v]); setTNewCourseInput(''); }}>Add</button>
+                <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                  <div style={{flex:1}}>
+                    <select value={(tCourseCodes && tCourseCodes[0]) || ''} onChange={e => { const v = e.target.value; if (!v) return; setTCourseCodes([v]); }} style={{width:'100%'}}>
+                      <option value="">-- select existing course --</option>
+                      {courses.map(c => (
+                        <option key={c.course_code} value={c.course_code}>{c.course_code} {c.course_name ? '- ' + c.course_name : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <input placeholder="Add new code" value={tNewCourseInput} onChange={e=>setTNewCourseInput(e.target.value)} />
+                  <button type="button" className="btn" onClick={() => { const v = (tNewCourseInput||'').trim(); if (!v) return; setTCourseCodes([v]); setTNewCourseInput(''); }}>Add</button>
                 </div>
               </div>
             </div>

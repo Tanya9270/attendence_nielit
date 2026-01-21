@@ -247,7 +247,7 @@ export const api = {
     return response.json();
   },
 
-  async createTeacher(token, username, password, courseCodes = [], courseName = '') {
+  async createTeacher(token, username, password, courseCodesOrSingle = [], courseName = '') {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/teachers`, {
         method: 'POST',
@@ -255,7 +255,10 @@ export const api = {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ username, password, course_codes: courseCodes, course_name: courseName })
+        // Allow passing either a single course code string or an array of codes
+        body: JSON.stringify(
+          typeof courseCodesOrSingle === 'string' ? { username, password, course_code: courseCodesOrSingle, course_name: courseName } : { username, password, course_codes: courseCodesOrSingle, course_name: courseName }
+        )
       });
 
       // Try parsing JSON, but fall back to text for HTML/error pages
