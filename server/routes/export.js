@@ -292,21 +292,24 @@ router.get('/daily/csv', authenticateToken, requireRole('teacher', 'admin'), asy
             attendanceMap[att.student_id] = att;
         });
 
-        // Generate CSV
-        let csv = '';
-        
-        // Header info with prominent Course Code and Course Name
-        csv += 'NIELIT - Daily Attendance Report\n';
-        csv += `Course Code,${courseInfo.course_code}\n`;
-        csv += `Course Name,${courseInfo.course_name}\n`;
-        csv += `Teacher,${courseInfo.teacher_name || 'N/A'}\n`;
-        csv += `Date,${new Date(targetDate).toLocaleDateString('en-IN')}\n`;
-        csv += '\n';
-        
-        // Table header (no Class/Section columns)
-        csv += 'S.No,Roll Number,Name,Status,Scan Time (IST)\n';
-        
-        studentsResult.rows.forEach((student, index) => {
+        // Stream CSV to reduce memory usage / latency
+        res.setHeader('Content-Type', 'text/csv');
+        const filename = `attendance-${courseInfo.course_code}-${targetDate}.csv`;
+        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+
+        // Write header info
+        res.write('NIELIT - Daily Attendance Report\n');
+        res.write(`Course Code,${courseInfo.course_code}\n`);
+        res.write(`Course Name,${courseInfo.course_name}\n`);
+        res.write(`Teacher,${courseInfo.teacher_name || 'N/A'}\n`);
+        res.write(`Date,${new Date(targetDate).toLocaleDateString('en-IN')}\n`);
+        res.write('\n');
+
+        // Table header
+        res.write('S.No,Roll Number,Name,Status,Scan Time (IST)\n');
+
+        for (let i = 0; i < studentsResult.rows.length; i++) {
+            const student = studentsResult.rows[i];
             const att = attendanceMap[student.id];
             const status = att?.status || 'absent';
             const scanTime = att?.scan_time 
@@ -316,13 +319,14 @@ router.get('/daily/csv', authenticateToken, requireRole('teacher', 'admin'), asy
                     timeZone: 'Asia/Kolkata'
                   })
                 : '';
-            csv += `${index + 1},${student.roll_number},"${student.name}",${status},${scanTime}\n`;
-        });
+            const line = `${i + 1},${student.roll_number},"${student.name}",${status},${scanTime}\n`;
+            if (!res.write(line)) {
+                // backpressure handling
+                await new Promise(resolve => res.once('drain', resolve));
+            }
+        }
 
-        res.setHeader('Content-Type', 'text/csv');
-        const filename = `attendance-${courseInfo.course_code}-${targetDate}.csv`;
-        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
-        res.send(csv);
+        res.end();
     } catch (error) {
         console.error('Export daily CSV error:', error);
         res.status(500).json({ ok: false, error: 'internal_error' });
@@ -663,34 +667,35 @@ router.get('/monthly/csv', authenticateToken, requireRole('teacher', 'admin'), a
             }
         });
 
-        // Generate CSV
-        let csv = '';
-        
-        // Header info with prominent Course Code and Course Name (no Class info)
-        csv += 'NIELIT - Monthly Attendance Report\n';
-        csv += `Course Code,${courseInfo.course_code}\n`;
-        csv += `Course Name,${courseInfo.course_name}\n`;
-        csv += `Teacher,${courseInfo.teacher_name || 'N/A'}\n`;
-        csv += `Month,${monthName} ${targetYear}\n`;
-        csv += `Working Days,${workingDays}\n`;
-        csv += '\n';
-        
-        // Table header (no Class/Section columns)
-        csv += 'S.No,Roll Number,Name,Present,Absent,Leave,Percentage,Status\n';
-        
-        studentsResult.rows.forEach((student, index) => {
+        // Stream CSV to reduce memory usage / latency
+        res.setHeader('Content-Type', 'text/csv');
+        const filename = `attendance-${courseInfo.course_code}-${monthName}-${targetYear}.csv`;
+        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+
+        res.write('NIELIT - Monthly Attendance Report\n');
+        res.write(`Course Code,${courseInfo.course_code}\n`);
+        res.write(`Course Name,${courseInfo.course_name}\n`);
+        res.write(`Teacher,${courseInfo.teacher_name || 'N/A'}\n`);
+        res.write(`Month,${monthName} ${targetYear}\n`);
+        res.write(`Working Days,${workingDays}\n`);
+        res.write('\n');
+
+        // Table header
+        res.write('S.No,Roll Number,Name,Present,Absent,Leave,Percentage,Status\n');
+
+        for (let i = 0; i < studentsResult.rows.length; i++) {
+            const student = studentsResult.rows[i];
             const att = studentAttendance[student.id] || { present: 0, leave: 0 };
             const absent = workingDays - att.present - att.leave;
             const percentage = workingDays > 0 ? ((att.present / workingDays) * 100).toFixed(1) : 0;
             const status = percentage >= 75 ? 'Good' : percentage >= 50 ? 'Low' : 'Critical';
-            
-            csv += `${index + 1},${student.roll_number},"${student.name}",${att.present},${absent},${att.leave},${percentage}%,${status}\n`;
-        });
+            const line = `${i + 1},${student.roll_number},"${student.name}",${att.present},${absent},${att.leave},${percentage}%,${status}\n`;
+            if (!res.write(line)) {
+                await new Promise(resolve => res.once('drain', resolve));
+            }
+        }
 
-        res.setHeader('Content-Type', 'text/csv');
-        const filename = `attendance-${courseInfo.course_code}-${monthName}-${targetYear}.csv`;
-        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
-        res.send(csv);
+        res.end();
     } catch (error) {
         console.error('Export monthly CSV error:', error);
         res.status(500).json({ ok: false, error: 'internal_error' });
