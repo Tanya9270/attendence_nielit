@@ -247,7 +247,7 @@ export const api = {
     return response.json();
   },
 
-  async createTeacher(token, username, password, courseCode = '', courseName = '') {
+  async createTeacher(token, username, password, courseCodes = [], courseName = '') {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/teachers`, {
         method: 'POST',
@@ -255,7 +255,7 @@ export const api = {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ username, password, course_code: courseCode, course_name: courseName })
+        body: JSON.stringify({ username, password, course_codes: courseCodes, course_name: courseName })
       });
 
       // Try parsing JSON, but fall back to text for HTML/error pages
@@ -281,7 +281,7 @@ export const api = {
     }
   },
 
-  async createStudent(token, rollNumber, name, courseCode = '', password = '') {
+  async createStudent(token, rollNumber, name, courseCodes = [], password = '') {
     try {
       const response = await fetch(`${API_BASE_URL}/students`, {
         method: 'POST',
@@ -289,7 +289,7 @@ export const api = {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ roll_number: rollNumber, name, course_code: courseCode, password })
+        body: JSON.stringify({ roll_number: rollNumber, name, course_codes: courseCodes, password })
       });
 
       let data;

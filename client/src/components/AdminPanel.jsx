@@ -5,11 +5,13 @@ export default function AdminPanel({ token }) {
   const [tUsername, setTUsername] = useState('');
   const [tPassword, setTPassword] = useState('');
   const [tCourseCode, setTCourseCode] = useState('');
+  const [tCourseCodes, setTCourseCodes] = useState([]);
   const [tCourseName, setTCourseName] = useState('');
   const [sRoll, setSRoll] = useState('');
   const [sName, setSName] = useState('');
   const [sPassword, setSPassword] = useState('');
   const [sCourse, setSCourse] = useState('');
+  const [sCourseCodes, setSCourseCodes] = useState([]);
   const [msg, setMsg] = useState('');
   const [msgType, setMsgType] = useState('success');
   const [teachers, setTeachers] = useState([]);
@@ -64,7 +66,7 @@ export default function AdminPanel({ token }) {
     e.preventDefault();
     try {
       if (editingTeacherId) {
-        const res = await api.updateTeacher(token, editingTeacherId, { username: tUsername, password: tPassword || undefined, course_code: tCourseCode, course_name: tCourseName });
+        const res = await api.updateTeacher(token, editingTeacherId, { username: tUsername, password: tPassword || undefined, course_codes: tCourseCodes, course_name: tCourseName });
         if (res && res.ok) {
           setMsgType('success'); setMsg('Teacher updated');
           setEditingTeacherId(null); setTUsername(''); setTPassword(''); setTCourseCode(''); setTCourseName('');
@@ -73,12 +75,12 @@ export default function AdminPanel({ token }) {
           setMsgType('error'); setMsg(res.error || 'Failed to update teacher');
         }
       } else {
-        const res = await api.createTeacher(token, tUsername, tPassword, tCourseCode, tCourseName);
+        const res = await api.createTeacher(token, tUsername, tPassword, tCourseCodes, tCourseName);
         console.log('createTeacher response:', res);
         if (res.ok) {
           setMsgType('success');
           setMsg('Teacher created successfully');
-          setTUsername(''); setTPassword(''); setTCourseCode(''); setTCourseName('');
+          setTUsername(''); setTPassword(''); setTCourseCode(''); setTCourseCodes([]); setTCourseName('');
           loadLists();
         } else {
           setMsgType('error');
@@ -96,21 +98,22 @@ export default function AdminPanel({ token }) {
     e.preventDefault();
     try {
       if (editingStudentId) {
-        const res = await api.updateStudent(token, editingStudentId, { roll_number: sRoll, name: sName, course_code: sCourse, password: sPassword || undefined });
+        const res = await api.updateStudent(token, editingStudentId, { roll_number: sRoll, name: sName, course_codes: sCourseCodes, password: sPassword || undefined });
         if (res && res.ok) {
           setMsgType('success'); setMsg('Student updated');
           setEditingStudentId(null); setSRoll(''); setSName(''); setSCourse(''); setSPassword('');
+          setSCourseCodes([]);
           loadStudents();
         } else {
           setMsgType('error'); setMsg(res.error || 'Failed to update student');
         }
       } else {
-        const res = await api.createStudent(token, sRoll, sName, sCourse, sPassword);
+        const res = await api.createStudent(token, sRoll, sName, sCourseCodes, sPassword);
         console.log('createStudent response:', res);
         if (res.ok) {
           setMsgType('success');
           setMsg('Student created successfully');
-          setSRoll(''); setSName(''); setSCourse(''); setSPassword('');
+          setSRoll(''); setSName(''); setSCourse(''); setSCourseCodes([]); setSPassword('');
           loadStudents();
         } else {
           setMsgType('error');
@@ -171,13 +174,14 @@ export default function AdminPanel({ token }) {
     setEditingTeacherId(t.id);
     setTUsername(t.username || '');
     setTCourseCode(t.course_code || '');
+    setTCourseCodes(t.course_codes || (t.course_code ? [t.course_code] : []));
     setTCourseName(t.course_name || '');
     setTPassword('');
   };
 
   const cancelEditTeacher = () => {
     setEditingTeacherId(null);
-    setTUsername(''); setTPassword(''); setTCourseCode(''); setTCourseName('');
+    setTUsername(''); setTPassword(''); setTCourseCode(''); setTCourseCodes([]); setTCourseName('');
   };
 
   const startEditStudent = (s) => {
@@ -185,13 +189,14 @@ export default function AdminPanel({ token }) {
     setSRoll(s.roll_number || '');
     setSName(s.name || '');
     setSCourse(s.course_code || '');
+    setSCourseCodes(s.course_codes || (s.course_code ? [s.course_code] : []));
     setSPassword('');
     setEditingStudentUsername(s.username || '');
   };
 
   const cancelEditStudent = () => {
     setEditingStudentId(null);
-    setSRoll(''); setSName(''); setSCourse(''); setSPassword('');
+    setSRoll(''); setSName(''); setSCourse(''); setSCourseCodes([]); setSPassword('');
     setEditingStudentUsername('');
   };
 
@@ -224,8 +229,12 @@ export default function AdminPanel({ token }) {
               <input type="password" value={tPassword} onChange={e=>setTPassword(e.target.value)} required />
             </div>
             <div className="form-group">
-              <label>Course Code</label>
-              <input value={tCourseCode} onChange={e=>setTCourseCode(e.target.value)} />
+              <label>Course Codes (select multiple)</label>
+              <select multiple value={tCourseCodes} onChange={e => setTCourseCodes(Array.from(e.target.selectedOptions).map(o => o.value))} style={{width:'100%',minHeight:80}}>
+                {courses.map(c => (
+                  <option key={c.course_code} value={c.course_code}>{c.course_code} {c.course_name ? '- ' + c.course_name : ''}</option>
+                ))}
+              </select>
             </div>
             <div className="form-group">
               <label>Course Name</label>
@@ -263,8 +272,12 @@ export default function AdminPanel({ token }) {
               <input type="password" value={sPassword} onChange={e=>setSPassword(e.target.value)} placeholder="Leave blank to use roll number" />
             </div>
             <div className="form-group">
-              <label>Course Code</label>
-              <input value={sCourse} onChange={e=>setSCourse(e.target.value)} />
+              <label>Course Codes (select multiple)</label>
+              <select multiple value={sCourseCodes} onChange={e => setSCourseCodes(Array.from(e.target.selectedOptions).map(o => o.value))} style={{width:'100%',minHeight:80}}>
+                {courses.map(c => (
+                  <option key={c.course_code} value={c.course_code}>{c.course_code} {c.course_name ? '- ' + c.course_name : ''}</option>
+                ))}
+              </select>
             </div>
             <div className="form-group" style={{display:'flex',gap:8}}>
               <button type="submit" className="btn btn-primary">{editingStudentId ? 'Save' : 'Create Student'}</button>
@@ -302,7 +315,7 @@ export default function AdminPanel({ token }) {
                   <tr key={t.id}>
                     <td style={{fontWeight:600}}>{t.username}</td>
                     <td>{t.last_login_at ? new Date(t.last_login_at).toLocaleString() : '-'}</td>
-                    <td>{t.course_code ? `${t.course_code} ${t.course_name ? '- ' + t.course_name : ''}` : '-'}</td>
+                    <td>{t.course_codes && t.course_codes.length ? t.course_codes.join(', ') : (t.course_code ? `${t.course_code} ${t.course_name ? '- ' + t.course_name : ''}` : '-')}</td>
                     <td>
                       <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
                         <button className="btn" onClick={() => startEditTeacher(t)}>Edit</button>
@@ -348,7 +361,7 @@ export default function AdminPanel({ token }) {
                   <tr key={s.id}>
                     <td style={{fontWeight:600}}>{s.roll_number}</td>
                     <td>{s.name}</td>
-                    <td>{s.course_code || '-'}</td>
+                    <td>{(s.course_codes && s.course_codes.length) ? s.course_codes.join(', ') : (s.course_code || '-')}</td>
                     <td>{s.username || '-'}</td>
                     <td>
                       <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
