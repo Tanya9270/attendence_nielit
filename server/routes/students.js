@@ -396,5 +396,96 @@ router.delete('/:id', authenticateToken, requireRole('admin'), async (req, res) 
     }
 });
 
+// Update a student (teacher/admin)
+// PUT /students/:id
+router.put('/:id', authenticateToken, requireRole('teacher', 'admin'), async (req, res) => {
+    try {
+        const studentId = req.params.id;
+        const { roll_number: newRoll, name: newName, course_code: newCourseCode, password } = req.body;
+
+        // Fetch existing student and user
+        const sres = await db.query('SELECT id, user_id, roll_number, name, course_code FROM students WHERE id = $1', [studentId]);
+        if (!sres || !sres.rows || sres.rows.length === 0) return res.status(404).json({ ok: false, error: 'student_not_found' });
+        const student = sres.rows[0];
+
+        // Normalize new roll if provided
+        const rollNorm = newRoll !== undefined && newRoll !== null ? newRoll.toString().trim() : student.roll_number;
+        const courseCodeNorm = newCourseCode !== undefined ? newCourseCode : student.course_code;
+
+        // If roll or course changed, ensure uniqueness within the course
+        if (rollNorm !== student.roll_number || courseCodeNorm !== student.course_code) {
+            const existing = await db.query(
+                'SELECT id FROM students WHERE roll_number = $1 AND (course_code = $2 OR (course_code IS NULL AND $2 IS NULL)) AND id <> $3',
+                [rollNorm, courseCodeNorm !== undefined && courseCodeNorm !== null ? courseCodeNorm : null, studentId]
+            );
+            if (existing && existing.rows && existing.rows.length > 0) {
+                return res.status(409).json({ ok: false, error: 'roll_exists' });
+            }
+        }
+
+        const client = await db.connect();
+        try {
+            await client.query('BEGIN');
+
+            // If password provided, update user's password
+            if (password) {
+                const hash = await bcrypt.hash(password, 10);
+                await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, student.user_id]);
+            }
+
+            // If roll or course changed, recompute username and update users.username if needed
+            if (rollNorm !== student.roll_number || courseCodeNorm !== student.course_code) {
+                // Build username exactly like create logic
+                let courseNumber = '';
+                let courseLetters = '';
+                if (courseCodeNorm) {
+                    const code = courseCodeNorm.toString();
+                    const parts = code.split(/[-_\//]/).map(p => p.trim()).filter(Boolean);
+                    if (parts.length >= 2) {
+                        courseLetters = parts[0].replace(/[^A-Za-z]/g, '').toUpperCase().substring(0,6);
+                        courseNumber = parts[1].replace(/[^0-9]/g, '').padStart(3, '0');
+                    } else {
+                        const m = code.match(/^([A-Za-z]+)\D*(\d+)$/);
+                        if (m) {
+                            courseLetters = m[1].toUpperCase().substring(0,6);
+                            courseNumber = m[2].padStart(3, '0');
+                        } else {
+                            courseLetters = code.replace(/[^A-Za-z]/g, '').toUpperCase().substring(0,6) || 'UNK';
+                            courseNumber = (code.replace(/[^0-9]/g, '').substring(0,3) || '0').padStart(3, '0');
+                        }
+                    }
+                }
+                if (!courseNumber) courseNumber = '000';
+                if (!courseLetters) courseLetters = 'UNK';
+                const newUsername = `${courseNumber}/${courseLetters}/${rollNorm}`;
+
+                const existsUser = await client.query('SELECT id FROM users WHERE username = $1 AND id <> $2', [newUsername, student.user_id]);
+                if (existsUser && existsUser.rows && existsUser.rows.length > 0) {
+                    await client.query('ROLLBACK');
+                    return res.status(409).json({ ok: false, error: 'user_exists' });
+                }
+
+                await client.query('UPDATE users SET username = $1 WHERE id = $2', [newUsername, student.user_id]);
+            }
+
+            // Update students row
+            await client.query('UPDATE students SET roll_number = $1, name = $2, course_code = $3 WHERE id = $4', [rollNorm, newName !== undefined ? newName : student.name, courseCodeNorm !== undefined ? courseCodeNorm : student.course_code, studentId]);
+
+            await client.query('COMMIT');
+            res.json({ ok: true });
+        } catch (txErr) {
+            try { await client.query('ROLLBACK'); } catch (e) { /* ignore */ }
+            console.error('Update student transaction error:', txErr);
+            if (txErr && txErr.code === '23505') return res.status(409).json({ ok: false, error: 'duplicate_key' });
+            res.status(500).json({ ok: false, error: 'internal_error' });
+        } finally {
+            client.release();
+        }
+    } catch (err) {
+        console.error('Update student error:', err);
+        res.status(500).json({ ok: false, error: 'internal_error' });
+    }
+});
+
 export default router;
 
