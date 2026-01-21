@@ -7,6 +7,13 @@ import { dirname, join } from 'path';
 import { existsSync, readFileSync } from 'fs';
 
 const router = express.Router();
+const showErrors = (process.env.SHOW_ERRORS || 'false').toLowerCase() === 'true';
+
+function handleServerError(res, context, err) {
+    console.error(context, err);
+    if (showErrors) return res.status(500).json({ ok: false, error: err.message, stack: err.stack });
+    return res.status(500).json({ ok: false, error: 'internal_error' });
+}
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -252,8 +259,7 @@ router.get('/daily/pdf', authenticateToken, requireRole('teacher', 'admin'), asy
 
         doc.end();
     } catch (error) {
-        console.error('Export daily PDF error:', error);
-        res.status(500).json({ ok: false, error: 'internal_error' });
+        return handleServerError(res, 'Export daily PDF error:', error);
     }
 });
 
@@ -328,8 +334,7 @@ router.get('/daily/csv', authenticateToken, requireRole('teacher', 'admin'), asy
 
         res.end();
     } catch (error) {
-        console.error('Export daily CSV error:', error);
-        res.status(500).json({ ok: false, error: 'internal_error' });
+        return handleServerError(res, 'Export daily CSV error:', error);
     }
 });
 
@@ -598,8 +603,7 @@ router.get('/monthly/pdf', authenticateToken, requireRole('teacher', 'admin'), a
 
         doc.end();
     } catch (error) {
-        console.error('Export monthly PDF error:', error);
-        res.status(500).json({ ok: false, error: 'internal_error' });
+        return handleServerError(res, 'Export monthly PDF error:', error);
     }
 });
 
@@ -697,8 +701,7 @@ router.get('/monthly/csv', authenticateToken, requireRole('teacher', 'admin'), a
 
         res.end();
     } catch (error) {
-        console.error('Export monthly CSV error:', error);
-        res.status(500).json({ ok: false, error: 'internal_error' });
+        return handleServerError(res, 'Export monthly CSV error:', error);
     }
 });
 
