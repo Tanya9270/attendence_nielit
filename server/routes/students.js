@@ -276,8 +276,13 @@ router.post('/', authenticateToken, requireRole('teacher', 'admin'), async (req,
         roll_number = roll_number !== undefined && roll_number !== null ? roll_number.toString().trim() : roll_number;
         if (!roll_number || !name) return res.status(400).json({ ok: false, error: 'missing_fields' });
 
-        // Early check: ensure roll_number is unique to give a clear error before transaction
-        const existingRoll = await db.query('SELECT id FROM students WHERE roll_number = $1', [roll_number]);
+        // Early check: ensure roll_number is unique within the same course to give a clear error
+        // Treat missing course_code as NULL so students without a course don't collide unintentionally.
+        const courseCodeParam = course_code !== undefined && course_code !== null ? course_code : null;
+        const existingRoll = await db.query(
+            'SELECT id FROM students WHERE roll_number = $1 AND (course_code = $2 OR (course_code IS NULL AND $2 IS NULL))',
+            [roll_number, courseCodeParam]
+        );
         if (existingRoll && existingRoll.rows && existingRoll.rows.length > 0) {
             return res.status(409).json({ ok: false, error: 'roll_exists' });
         }
@@ -357,7 +362,7 @@ router.post('/', authenticateToken, requireRole('teacher', 'admin'), async (req,
                 if (detail.includes('username') || constraint.includes('users_username')) {
                     return res.status(409).json({ ok: false, error: 'user_exists' });
                 }
-                if (detail.includes('roll_number') || constraint.includes('students_roll_number')) {
+                if (detail.includes('roll_number') || constraint.includes('students_roll_number') || constraint.includes('students_roll_number_course_code_key')) {
                     return res.status(409).json({ ok: false, error: 'roll_exists' });
                 }
                 // Fallback to generic duplicate error
