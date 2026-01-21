@@ -271,8 +271,16 @@ router.get('/', authenticateToken, requireRole('teacher', 'admin'), async (req, 
 // Create a student (teacher can add students for their course)
 router.post('/', authenticateToken, requireRole('teacher', 'admin'), async (req, res) => {
     try {
-        const { roll_number, name, course_code, password } = req.body;
+        let { roll_number, name, course_code, password } = req.body;
+        // Normalize/trim roll number to avoid accidental duplicates due to whitespace or numeric types
+        roll_number = roll_number !== undefined && roll_number !== null ? roll_number.toString().trim() : roll_number;
         if (!roll_number || !name) return res.status(400).json({ ok: false, error: 'missing_fields' });
+
+        // Early check: ensure roll_number is unique to give a clear error before transaction
+        const existingRoll = await db.query('SELECT id FROM students WHERE roll_number = $1', [roll_number]);
+        if (existingRoll && existingRoll.rows && existingRoll.rows.length > 0) {
+            return res.status(409).json({ ok: false, error: 'roll_exists' });
+        }
 
         // If teacher, ensure they are assigned to the course (best-effort: match teacher_name to username)
         if (req.user.role === 'teacher' && course_code) {
