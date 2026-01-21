@@ -6,6 +6,13 @@ import { authenticateToken, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Helper: normalize course codes input to array of trimmed strings
+function normalizeCourseCodes(input) {
+    if (!input) return [];
+    if (Array.isArray(input)) return input.map(c => c && c.toString().trim()).filter(Boolean);
+    return input.toString().split(/[;,|]+/).map(s => s.trim()).filter(Boolean);
+}
+
 // Login endpoint
 router.post('/login', async (req, res) => {
     try {
@@ -80,6 +87,13 @@ router.get('/admin/teachers', authenticateToken, requireRole('admin'), async (re
     try {
         const result = await db.query('SELECT id, username, role, last_login_at FROM users WHERE role = $1 ORDER BY username', ['teacher']);
         const teachers = result.rows;
+
+        // Attach courses for each teacher
+        for (const t of teachers) {
+            const tc = await db.query('SELECT course_code FROM teacher_courses WHERE user_id = $1', [t.id]);
+            t.course_codes = tc.rows.map(r => r.course_code);
+        }
+
         res.json({ ok: true, teachers });
     } catch (err) {
         console.error('List teachers error:', err);
@@ -152,11 +166,11 @@ router.post('/users/change-password', authenticateToken, async (req, res) => {
     }
 });
 
-// Admin: create a teacher (and optionally a course)
+// Admin: create a teacher (and optionally one or more courses)
 // POST /admin/teachers
 router.post('/admin/teachers', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
-        const { username, password, course_code, course_name } = req.body;
+        const { username, password, course_code, course_name, course_codes } = req.body;
         console.log('Create teacher request by:', req.user && req.user.username, 'role:', req.user && req.user.role);
         console.log('Request body:', req.body);
         if (!username || !password) return res.status(400).json({ ok: false, error: 'missing_fields' });
@@ -174,14 +188,20 @@ router.post('/admin/teachers', authenticateToken, requireRole('admin'), async (r
         );
         const teacherId = insertRes.rows[0].id;
 
-        // Optionally create or update course
-        if (course_code) {
-            const courseRes = await db.query('SELECT id FROM courses WHERE course_code = $1', [course_code]);
+        // Normalize course codes (accept single or multiple)
+        const codes = normalizeCourseCodes(course_codes || course_code);
+
+        // For each course code, create or update the course and map teacher
+        for (const cc of codes) {
+            const courseRes = await db.query('SELECT id FROM courses WHERE course_code = $1', [cc]);
             if (!courseRes || courseRes.rows.length === 0) {
-                await db.query('INSERT INTO courses (course_code, course_name, teacher_name) VALUES ($1, $2, $3)', [course_code, course_name || course_code, username]);
+                await db.query('INSERT INTO courses (course_code, course_name, teacher_name) VALUES ($1, $2, $3)', [cc, course_name || cc, username]);
             } else {
-                await db.query('UPDATE courses SET teacher_name = $1, course_name = COALESCE($2, course_name) WHERE course_code = $3', [username, course_name, course_code]);
+                await db.query('UPDATE courses SET teacher_name = $1, course_name = COALESCE($2, course_name) WHERE course_code = $3', [username, course_name, cc]);
             }
+
+            // Insert into teacher_courses join table
+            await db.query('INSERT INTO teacher_courses (user_id, course_code) VALUES ($1, $2) ON CONFLICT DO NOTHING', [teacherId, cc]);
         }
 
         res.json({ ok: true, teacherId });
