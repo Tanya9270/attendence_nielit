@@ -532,10 +532,13 @@ router.get('/monthly/pdf', authenticateToken, requireRole('teacher', 'admin'), a
                 rowY = 50;
             }
             
-            // Student name
-            doc.fillColor('#333');
-            doc.text(`${student.roll_number}`, startX, rowY, { width: nameColWidth });
-            doc.text(`${student.name.substring(0, 15)}`, startX, rowY + 7, { width: nameColWidth });
+            // Student roll number and name (name in blue, on same row)
+            doc.fillColor('#333').font('Helvetica-Bold');
+            doc.text(`${student.roll_number}`, startX, rowY, { width: 18, align: 'left' });
+            doc.fillColor('#0066B3').font('Helvetica');
+            doc.text(`${student.name.substring(0, 20)}`, startX + 22, rowY, { width: nameColWidth - 22, align: 'left' });
+            // restore base font/color for daily cells
+            doc.fillColor('#333').font('Helvetica');
             
             // Daily attendance
             for (let day = 1; day <= daysInMonth; day++) {
