@@ -35,7 +35,7 @@ router.post('/scan', authenticateToken, requireRole('teacher', 'admin'), async (
 
         // Get student by roll number
         const studentResult = await db.query(
-            'SELECT id, roll_number, name, class, section FROM students WHERE roll_number = $1',
+            'SELECT id, roll_number, name, course_code FROM students WHERE roll_number = $1',
             [roll_number]
         );
 
@@ -126,7 +126,7 @@ router.post('/scan', authenticateToken, requireRole('teacher', 'admin'), async (
                 id: student.id,
                 roll_number: student.roll_number,
                 name: student.name,
-                class: student.class,
+                course_code: student.course_code,
                 section: student.section
             },
             scan_time: server_scan_time.toISOString(),
@@ -460,7 +460,7 @@ router.get('/export', authenticateToken, requireRole('teacher', 'admin'), async 
         const targetDate = date || new Date().toISOString().split('T')[0];
 
         // First get all students
-        let studentsQuery = 'SELECT id, roll_number, name, class, section FROM students';
+        let studentsQuery = 'SELECT id, roll_number, name, course_code FROM students';
         const params = [];
 
         if (className) {
@@ -494,7 +494,7 @@ router.get('/export', authenticateToken, requireRole('teacher', 'admin'), async 
             rows: studentsResult.rows.map(student => ({
                 roll_number: student.roll_number,
                 name: student.name,
-                class: student.class,
+                course_code: student.course_code,
                 section: student.section,
                 status: attendanceMap[student.id]?.status || 'absent',
                 scan_time: attendanceMap[student.id]?.scan_time || null
@@ -502,7 +502,7 @@ router.get('/export', authenticateToken, requireRole('teacher', 'admin'), async 
         };
 
         // Generate CSV
-        let csv = 'Roll Number,Name,Class,Section,Status,Scan Time (IST)\n';
+        let csv = 'Roll Number,Name,Course,Status,Scan Time (IST)\n';
         result.rows.forEach(row => {
             const scanTimeFormatted = row.scan_time 
                 ? new Date(row.scan_time).toLocaleString('en-IN', { 

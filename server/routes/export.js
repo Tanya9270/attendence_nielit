@@ -86,7 +86,7 @@ router.get('/daily/pdf', authenticateToken, requireRole('teacher', 'admin'), asy
 
         // Get ONLY students enrolled in this course
         const studentsResult = await db.query(
-            'SELECT id, roll_number, name, class, section, course_code FROM students WHERE course_code = $1 ORDER BY roll_number',
+            'SELECT id, roll_number, name, course_code FROM students WHERE course_code = $1 ORDER BY roll_number',
             [course_code]
         );
         
@@ -283,7 +283,7 @@ router.get('/daily/csv', authenticateToken, requireRole('teacher', 'admin'), asy
 
         // Get ONLY students enrolled in this course
         const studentsResult = await db.query(
-            'SELECT id, roll_number, name, class, section, course_code FROM students WHERE course_code = $1 ORDER BY roll_number',
+            'SELECT id, roll_number, name, course_code FROM students WHERE course_code = $1 ORDER BY roll_number',
             [course_code]
         );
         
@@ -365,7 +365,7 @@ router.get('/monthly/pdf', authenticateToken, requireRole('teacher', 'admin'), a
 
         // Get ONLY students enrolled in this course
         const studentsResult = await db.query(
-            'SELECT id, roll_number, name, class, section, course_code FROM students WHERE course_code = $1 ORDER BY roll_number',
+            'SELECT id, roll_number, name, course_code FROM students WHERE course_code = $1 ORDER BY roll_number',
             [course_code]
         );
         
@@ -633,7 +633,7 @@ router.get('/monthly/csv', authenticateToken, requireRole('teacher', 'admin'), a
 
         // Get ONLY students enrolled in this course
         const studentsResult = await db.query(
-            'SELECT id, roll_number, name, class, section, course_code FROM students WHERE course_code = $1 ORDER BY roll_number',
+            'SELECT id, roll_number, name, course_code FROM students WHERE course_code = $1 ORDER BY roll_number',
             [course_code]
         );
         

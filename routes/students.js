@@ -77,7 +77,7 @@ router.get('/me/attendance-stats', authenticateToken, requireRole('student'), as
         
         // Get student info
         const studentResult = await db.query(
-            'SELECT s.id, s.roll_number, s.name, s.class, s.section, s.year FROM students s INNER JOIN users u ON s.user_id = u.id WHERE u.id = $1',
+            'SELECT s.id, s.roll_number, s.name, s.course_code, s.year FROM students s INNER JOIN users u ON s.user_id = u.id WHERE u.id = $1',
             [req.user.id]
         );
 
@@ -247,11 +247,11 @@ router.get('/', authenticateToken, requireRole('teacher', 'admin'), async (req, 
     try {
         const { class: className, section } = req.query;
         
-        let query = 'SELECT s.id, s.roll_number, s.name, s.class, s.section, s.year FROM students s ORDER BY s.roll_number';
+        let query = 'SELECT s.id, s.roll_number, s.name, s.course_code, s.year FROM students s ORDER BY s.roll_number';
         const params = [];
 
         if (className) {
-            query = 'SELECT s.id, s.roll_number, s.name, s.class, s.section, s.year FROM students s WHERE s.class = $1';
+            query = 'SELECT s.id, s.roll_number, s.name, s.course_code, s.year FROM students s WHERE s.course_code = $1';
             params.push(className);
             
             if (section) {
