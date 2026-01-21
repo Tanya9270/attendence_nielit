@@ -322,6 +322,7 @@ router.post('/', authenticateToken, requireRole('teacher', 'admin'), async (req,
             if (!courseLetters) courseLetters = 'UNK';
 
             const usernameBuilt = `${courseNumber}/${courseLetters}/${roll_number}`;
+            console.log('Creating student, usernameBuilt:', usernameBuilt, 'courseNumber:', courseNumber, 'courseLetters:', courseLetters, 'roll_number:', roll_number);
 
             const existing = await client.query('SELECT id FROM users WHERE username = $1', [usernameBuilt]);
             if (existing.rows && existing.rows.length > 0) {
@@ -341,9 +342,18 @@ router.post('/', authenticateToken, requireRole('teacher', 'admin'), async (req,
         } catch (txErr) {
             try { await client.query('ROLLBACK'); } catch (e) { /* ignore */ }
             console.error('Create student transaction error:', txErr);
-            // If unique constraint violation slipped through, return friendly error
+            // If unique constraint violation, try to map to a helpful error
             if (txErr && txErr.code === '23505') {
-                return res.status(409).json({ ok: false, error: 'user_exists' });
+                const detail = (txErr.detail || '').toString();
+                const constraint = (txErr.constraint || '').toString();
+                if (detail.includes('username') || constraint.includes('users_username')) {
+                    return res.status(409).json({ ok: false, error: 'user_exists' });
+                }
+                if (detail.includes('roll_number') || constraint.includes('students_roll_number')) {
+                    return res.status(409).json({ ok: false, error: 'roll_exists' });
+                }
+                // Fallback to generic duplicate error
+                return res.status(409).json({ ok: false, error: 'duplicate_key' });
             }
             res.status(500).json({ ok: false, error: 'internal_error' });
         } finally {
