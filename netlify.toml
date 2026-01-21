@@ -1,5 +1,7 @@
 [build]
-  command = "npm run build"
+  # Ensure Netlify installs client dependencies (including the Vite CLI)
+  # then runs the client build inside the `client` folder.
+  command = "cd client && npm ci && npm run build"
   publish = "client/dist"
 
 [context.production.environment]
