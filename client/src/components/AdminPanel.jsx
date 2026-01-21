@@ -12,6 +12,8 @@ export default function AdminPanel({ token }) {
   const [sPassword, setSPassword] = useState('');
   const [sCourse, setSCourse] = useState('');
   const [sCourseCodes, setSCourseCodes] = useState([]);
+  const [tNewCourseInput, setTNewCourseInput] = useState('');
+  const [sNewCourseInput, setSNewCourseInput] = useState('');
   const [msg, setMsg] = useState('');
   const [msgType, setMsgType] = useState('success');
   const [teachers, setTeachers] = useState([]);
@@ -230,11 +232,31 @@ export default function AdminPanel({ token }) {
             </div>
             <div className="form-group">
               <label>Course Codes (select multiple)</label>
-              <select multiple value={tCourseCodes} onChange={e => setTCourseCodes(Array.from(e.target.selectedOptions).map(o => o.value))} style={{width:'100%',minHeight:80}}>
-                {courses.map(c => (
-                  <option key={c.course_code} value={c.course_code}>{c.course_code} {c.course_name ? '- ' + c.course_name : ''}</option>
-                ))}
-              </select>
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  {(tCourseCodes || []).map(cc => (
+                    <div key={cc} style={{background:'#eef',padding:'6px 8px',borderRadius:6,display:'inline-flex',alignItems:'center',gap:8}}>
+                      <span style={{fontWeight:600}}>{cc}</span>
+                      <button type="button" className="btn" onClick={() => setTCourseCodes(prev => prev.filter(x => x !== cc))}>×</button>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:'flex',gap:8}}>
+                  <select value={''} onChange={e => {
+                    const v = e.target.value; if (!v) return; if (!tCourseCodes.includes(v)) setTCourseCodes(prev => [...prev, v]);
+                    e.target.value = '';
+                  }} style={{flex:1}}>
+                    <option value="">-- add from existing courses --</option>
+                    {courses.map(c => (
+                      <option key={c.course_code} value={c.course_code}>{c.course_code} {c.course_name ? '- ' + c.course_name : ''}</option>
+                    ))}
+                  </select>
+                  <input placeholder="Add new code (press Add or Enter)" value={tNewCourseInput} onChange={e=>setTNewCourseInput(e.target.value)} onKeyDown={e => {
+                    if (e.key === 'Enter') { e.preventDefault(); const v = (tNewCourseInput||'').trim(); if (!v) return; if (!tCourseCodes.includes(v)) setTCourseCodes(prev=>[...prev, v]); setTNewCourseInput(''); }
+                  }} />
+                  <button type="button" className="btn" onClick={() => { const v = (tNewCourseInput||'').trim(); if (!v) return; if (!tCourseCodes.includes(v)) setTCourseCodes(prev=>[...prev, v]); setTNewCourseInput(''); }}>Add</button>
+                </div>
+              </div>
             </div>
             <div className="form-group">
               <label>Course Name</label>
@@ -273,11 +295,31 @@ export default function AdminPanel({ token }) {
             </div>
             <div className="form-group">
               <label>Course Codes (select multiple)</label>
-              <select multiple value={sCourseCodes} onChange={e => setSCourseCodes(Array.from(e.target.selectedOptions).map(o => o.value))} style={{width:'100%',minHeight:80}}>
-                {courses.map(c => (
-                  <option key={c.course_code} value={c.course_code}>{c.course_code} {c.course_name ? '- ' + c.course_name : ''}</option>
-                ))}
-              </select>
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  {(sCourseCodes || []).map(cc => (
+                    <div key={cc} style={{background:'#eef',padding:'6px 8px',borderRadius:6,display:'inline-flex',alignItems:'center',gap:8}}>
+                      <span style={{fontWeight:600}}>{cc}</span>
+                      <button type="button" className="btn" onClick={() => setSCourseCodes(prev => prev.filter(x => x !== cc))}>×</button>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:'flex',gap:8}}>
+                  <select value={''} onChange={e => {
+                    const v = e.target.value; if (!v) return; if (!sCourseCodes.includes(v)) setSCourseCodes(prev => [...prev, v]);
+                    e.target.value = '';
+                  }} style={{flex:1}}>
+                    <option value="">-- add from existing courses --</option>
+                    {courses.map(c => (
+                      <option key={c.course_code} value={c.course_code}>{c.course_code} {c.course_name ? '- ' + c.course_name : ''}</option>
+                    ))}
+                  </select>
+                  <input placeholder="Add new code (press Add or Enter)" value={sNewCourseInput} onChange={e=>setSNewCourseInput(e.target.value)} onKeyDown={e => {
+                    if (e.key === 'Enter') { e.preventDefault(); const v = (sNewCourseInput||'').trim(); if (!v) return; if (!sCourseCodes.includes(v)) setSCourseCodes(prev=>[...prev, v]); setSNewCourseInput(''); }
+                  }} />
+                  <button type="button" className="btn" onClick={() => { const v = (sNewCourseInput||'').trim(); if (!v) return; if (!sCourseCodes.includes(v)) setSCourseCodes(prev=>[...prev, v]); setSNewCourseInput(''); }}>Add</button>
+                </div>
+              </div>
             </div>
             <div className="form-group" style={{display:'flex',gap:8}}>
               <button type="submit" className="btn btn-primary">{editingStudentId ? 'Save' : 'Create Student'}</button>
