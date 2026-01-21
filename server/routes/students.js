@@ -5,6 +5,13 @@ import bcrypt from 'bcryptjs';
 
 const router = express.Router();
 
+// Helper: normalize course codes input to array of trimmed strings (or empty array)
+function normalizeCourseCodes(input) {
+    if (!input) return [];
+    if (Array.isArray(input)) return input.map(c => c && c.toString().trim()).filter(Boolean);
+    return input.toString().split(/[;,|]+/).map(s => s.trim()).filter(Boolean);
+}
+
 // Helper function to check if a date is a holiday (Indian national holidays 2025)
 const getHolidays2025 = () => {
     return [
@@ -225,15 +232,19 @@ router.get('/me', authenticateToken, requireRole('student'), async (req, res) =>
 
         const student = result.rows[0];
 
-        // Get course name if course_code exists
-        if (student.course_code) {
-            const courseResult = await db.query(
-                'SELECT course_name FROM courses WHERE course_code = $1',
-                [student.course_code]
-            );
-            if (courseResult.rows.length > 0) {
-                student.course_name = courseResult.rows[0].course_name;
-            }
+        // Fetch enrolled courses from join table
+        const sc = await db.query('SELECT course_code FROM student_courses WHERE student_id = $1', [student.id]);
+        student.course_codes = sc.rows.map(r => r.course_code);
+
+        // Fetch course names for enrolled courses
+        if (student.course_codes && student.course_codes.length > 0) {
+            const placeholders = student.course_codes.map((_, i) => `$${i+1}`).join(',');
+            const courseResult = await db.query(`SELECT course_code, course_name FROM courses WHERE course_code IN (${placeholders})`, student.course_codes);
+            student.courses = courseResult.rows;
+        } else if (student.course_code) {
+            // Fallback to legacy single course
+            const courseResult = await db.query('SELECT course_name FROM courses WHERE course_code = $1', [student.course_code]);
+            if (courseResult.rows.length > 0) student.courses = [courseResult.rows[0]];
         }
 
         res.json(student);
@@ -261,7 +272,15 @@ router.get('/', authenticateToken, requireRole('teacher', 'admin'), async (req, 
         }
 
         const result = await db.query(query, params);
-        res.json(result.rows);
+        const students = result.rows;
+
+        // Fetch course codes for each student and attach
+        for (const s of students) {
+            const sc = await db.query('SELECT course_code FROM student_courses WHERE student_id = $1', [s.id]);
+            s.course_codes = sc.rows.map(r => r.course_code);
+        }
+
+        res.json(students);
     } catch (error) {
         console.error('Get students error:', error);
         res.status(500).json({ ok: false, error: 'internal_error' });
@@ -271,20 +290,23 @@ router.get('/', authenticateToken, requireRole('teacher', 'admin'), async (req, 
 // Create a student (teacher can add students for their course)
 router.post('/', authenticateToken, requireRole('teacher', 'admin'), async (req, res) => {
     try {
-        let { roll_number, name, course_code, password } = req.body;
+        let { roll_number, name, course_code, course_codes, password } = req.body;
         // Normalize/trim roll number to avoid accidental duplicates due to whitespace or numeric types
         roll_number = roll_number !== undefined && roll_number !== null ? roll_number.toString().trim() : roll_number;
         if (!roll_number || !name) return res.status(400).json({ ok: false, error: 'missing_fields' });
 
-        // Early check: ensure roll_number is unique within the same course to give a clear error
-        // Treat missing course_code as NULL so students without a course don't collide unintentionally.
-        const courseCodeParam = course_code !== undefined && course_code !== null ? course_code : null;
-        const existingRoll = await db.query(
-            'SELECT id FROM students WHERE roll_number = $1 AND (course_code = $2 OR (course_code IS NULL AND $2 IS NULL))',
-            [roll_number, courseCodeParam]
-        );
-        if (existingRoll && existingRoll.rows && existingRoll.rows.length > 0) {
-            return res.status(409).json({ ok: false, error: 'roll_exists' });
+        // Accept either `course_code` (string) or `course_codes` (array/string) for multiple enrollments
+        const courseCodes = normalizeCourseCodes(course_codes || course_code);
+
+        // Early check: ensure roll_number is unique within each supplied course
+        for (const cc of courseCodes.length ? courseCodes : [null]) {
+            const existingRoll = await db.query(
+                'SELECT id FROM students WHERE roll_number = $1 AND (course_code = $2 OR (course_code IS NULL AND $2 IS NULL))',
+                [roll_number, cc !== undefined && cc !== null ? cc : null]
+            );
+            if (existingRoll && existingRoll.rows && existingRoll.rows.length > 0) {
+                return res.status(409).json({ ok: false, error: 'roll_exists' });
+            }
         }
 
         // If teacher, ensure they are assigned to the course (best-effort: match teacher_name to username)
@@ -348,7 +370,15 @@ router.post('/', authenticateToken, requireRole('teacher', 'admin'), async (req,
             const userInsert = await client.query('INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id', [usernameBuilt, hash, 'student']);
             const userId = userInsert.rows[0].id;
 
-            await client.query('INSERT INTO students (user_id, roll_number, name, course_code) VALUES ($1, $2, $3, $4)', [userId, roll_number, name, course_code || null]);
+            // Insert student row (keep legacy `course_code` as first course for compatibility)
+            const primaryCourse = courseCodes.length ? courseCodes[0] : (course_code || null);
+            const studentInsert = await client.query('INSERT INTO students (user_id, roll_number, name, course_code) VALUES ($1, $2, $3, $4) RETURNING id', [userId, roll_number, name, primaryCourse || null]);
+            const studentId = studentInsert.rows[0].id;
+
+            // Insert into join table for each course_code (if any)
+            for (const cc of courseCodes) {
+                await client.query('INSERT INTO student_courses (student_id, course_code) VALUES ($1, $2) ON CONFLICT DO NOTHING', [studentId, cc]);
+            }
 
             await client.query('COMMIT');
             res.json({ ok: true, userId, username: usernameBuilt });
@@ -401,7 +431,7 @@ router.delete('/:id', authenticateToken, requireRole('admin'), async (req, res) 
 router.put('/:id', authenticateToken, requireRole('teacher', 'admin'), async (req, res) => {
     try {
         const studentId = req.params.id;
-        const { roll_number: newRoll, name: newName, course_code: newCourseCode, password } = req.body;
+        const { roll_number: newRoll, name: newName, course_code: newCourseCode, course_codes: newCourseCodes, password } = req.body;
 
         // Fetch existing student and user
         const sres = await db.query('SELECT id, user_id, roll_number, name, course_code FROM students WHERE id = $1', [studentId]);
@@ -410,13 +440,14 @@ router.put('/:id', authenticateToken, requireRole('teacher', 'admin'), async (re
 
         // Normalize new roll if provided
         const rollNorm = newRoll !== undefined && newRoll !== null ? newRoll.toString().trim() : student.roll_number;
-        const courseCodeNorm = newCourseCode !== undefined ? newCourseCode : student.course_code;
+        const courseCodesNorm = normalizeCourseCodes(newCourseCodes || newCourseCode || student.course_code);
 
-        // If roll or course changed, ensure uniqueness within the course
-        if (rollNorm !== student.roll_number || courseCodeNorm !== student.course_code) {
+        // If roll or course(s) changed, ensure uniqueness within each course
+        const coursesToCheck = courseCodesNorm.length ? courseCodesNorm : [null];
+        for (const cc of coursesToCheck) {
             const existing = await db.query(
                 'SELECT id FROM students WHERE roll_number = $1 AND (course_code = $2 OR (course_code IS NULL AND $2 IS NULL)) AND id <> $3',
-                [rollNorm, courseCodeNorm !== undefined && courseCodeNorm !== null ? courseCodeNorm : null, studentId]
+                [rollNorm, cc !== undefined && cc !== null ? cc : null, studentId]
             );
             if (existing && existing.rows && existing.rows.length > 0) {
                 return res.status(409).json({ ok: false, error: 'roll_exists' });
@@ -433,8 +464,8 @@ router.put('/:id', authenticateToken, requireRole('teacher', 'admin'), async (re
                 await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, student.user_id]);
             }
 
-            // If roll or course changed, recompute username and update users.username if needed
-            if (rollNorm !== student.roll_number || courseCodeNorm !== student.course_code) {
+            // If roll or primary course changed, recompute username and update users.username if needed
+            if (rollNorm !== student.roll_number || String((courseCodesNorm[0] || '')) !== String((student.course_code || ''))) {
                 // Build username exactly like create logic
                 let courseNumber = '';
                 let courseLetters = '';
@@ -468,8 +499,17 @@ router.put('/:id', authenticateToken, requireRole('teacher', 'admin'), async (re
                 await client.query('UPDATE users SET username = $1 WHERE id = $2', [newUsername, student.user_id]);
             }
 
-            // Update students row
-            await client.query('UPDATE students SET roll_number = $1, name = $2, course_code = $3 WHERE id = $4', [rollNorm, newName !== undefined ? newName : student.name, courseCodeNorm !== undefined ? courseCodeNorm : student.course_code, studentId]);
+            // Update student_courses join table: replace existing entries with new ones
+            if (Array.isArray(courseCodesNorm)) {
+                await client.query('DELETE FROM student_courses WHERE student_id = $1', [studentId]);
+                for (const cc of courseCodesNorm) {
+                    await client.query('INSERT INTO student_courses (student_id, course_code) VALUES ($1, $2) ON CONFLICT DO NOTHING', [studentId, cc]);
+                }
+            }
+
+            // Update students row (keep legacy single course_code as first mapped course for compatibility)
+            const primaryCourse = courseCodesNorm.length ? courseCodesNorm[0] : (newCourseCode !== undefined ? newCourseCode : student.course_code);
+            await client.query('UPDATE students SET roll_number = $1, name = $2, course_code = $3 WHERE id = $4', [rollNorm, newName !== undefined ? newName : student.name, primaryCourse !== undefined ? primaryCourse : student.course_code, studentId]);
 
             await client.query('COMMIT');
             res.json({ ok: true });
