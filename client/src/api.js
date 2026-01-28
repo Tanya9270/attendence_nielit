@@ -1,6 +1,39 @@
 // For online classes: Set VITE_API_URL environment variable to your ngrok backend URL
 // Example: VITE_API_URL=https://abc123.ngrok-free.app/api npm run dev
 // For local: keep as '/api' (uses Vite proxy)
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SERVICE_ROLE_KEY =
+  Deno.env.get("SERVICE_ROLE_KEY") ||
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
+  Deno.env.get("SUPABASE_SERVICE_ROLE") ||
+  "";
+const MARK_FN_API_KEY = Deno.env.get("MARK_FN_API_KEY") || "";
+
+const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase client from Vite env vars. Provide placeholders when not set.
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+export async function supabaseSignIn(email, password) {
+  return supabase.auth.signInWithPassword({ email, password });
+}
+
+export async function supabaseSignOut() {
+  return supabase.auth.signOut();
+}
+
+export async function getSupabaseAttendance(limit = 50) {
+  return supabase.from('attendance').select('*').limit(limit);
+}
+
+export async function supabaseMarkAttendance(qrPayload) {
+  // Calls the mark_attendance RPC created in the database
+  return supabase.rpc('mark_attendance', { qr_payload: qrPayload });
+}
 
 // Set API base URL: use env, else production, else local proxy
 // Prefer explicit environment override. When not provided, use local proxy `/api` for dev.
