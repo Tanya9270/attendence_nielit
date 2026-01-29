@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.93.2",
     "html5-qrcode": "^2.3.8",
     "qrcode": "^1.5.3",
     "react": "^18.2.0",
