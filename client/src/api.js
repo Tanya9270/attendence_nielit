@@ -16,7 +16,7 @@ const getHeaders = (token = null) => {
 };
 
 export const api = {
-  // --- 1. AUTHENTICATION (Updated with Role Security) ---
+  // --- 1. AUTHENTICATION (SECURE) ---
   async login(username, password) {
     try {
       // Map username to a login email for Supabase Auth
@@ -33,14 +33,13 @@ export const api = {
       if (!authRes.ok) return { ok: false, error: authData.error_description || 'invalid_credentials' };
 
       // B. SECURITY CHECK: Fetch the REAL role from the 'profiles' table
-      // This logic replaces the old "admin in username" check
       const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${authData.user.id}&select=role`, {
         headers: getHeaders(authData.access_token)
       });
       
       const profileData = await profileRes.json();
       
-      // Default to 'student' if no profile is found, otherwise use the DB role
+      // Default to 'student' if no profile is found
       const realRole = profileData[0]?.role || 'student';
 
       return {
@@ -58,7 +57,7 @@ export const api = {
     }
   },
 
-  // --- 2. STUDENT DATA (Using PostgREST) ---
+  // --- 2. STUDENT DATA ---
   async getStudentMe(token) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/students?select=*&limit=1`, {
       headers: getHeaders(token)
@@ -96,7 +95,7 @@ export const api = {
     });
     return res.json();
   },
-
+  
   // --- 5. ATTENDANCE STATS ---
   async getStudentAttendanceStatsByMonth(token, month, year) {
     let query = `${SUPABASE_URL}/rest/v1/attendance_stats?select=*`;
@@ -108,7 +107,7 @@ export const api = {
     return { ok: res.ok, stats: data[0] || {}, recentAttendance: data };
   },
   
-  // --- 6. ADMIN DASHBOARD DATA (Added for AdminPanel) ---
+  // --- 6. ADMIN DASHBOARD DATA ---
   async getDailyAttendance(token, date, courseCode) {
     let url = `${SUPABASE_URL}/rest/v1/attendance?select=*,students(name,roll_number)&date=eq.${date}`;
     if (courseCode) url += `&course_code=eq.${courseCode}`;
@@ -118,25 +117,36 @@ export const api = {
     return { ok: true, data: data };
   },
 
-  // --- 7. ADMIN ACTION METHODS ---
-  async createStudent(token, rollNumber, name, courseCodes) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/students`, {
+  // --- 7. ADMIN ACTION METHODS (UPDATED) ---
+
+  // Get all teachers
+  async getTeachers(token) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/teachers?select=*`, {
+      headers: getHeaders(token)
+    });
+    return res.json();
+  },
+
+  // Create Teacher with specific columns: username, password, course_code, course_name
+  async createTeacher(token, username, password, courseCode, courseName) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/teachers`, {
       method: 'POST',
       headers: getHeaders(token),
-      body: JSON.stringify({ roll_number: rollNumber, name, course_code: courseCodes[0] })
+      body: JSON.stringify({ 
+        username: username,
+        password: password,
+        course_code: courseCode,
+        course_name: courseName
+      })
     });
     return { ok: res.ok };
   },
 
-  async createTeacher(token, username, password, courseCodes, courseName) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/courses`, {
+  async createStudent(token, rollNumber, name, courseCodes) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/students`, {
       method: 'POST',
       headers: getHeaders(token),
-      body: JSON.stringify({ 
-        course_code: courseCodes[0], 
-        course_name: courseName, 
-        teacher_name: username 
-      })
+      body: JSON.stringify({ roll_number: rollNumber, name: name, course_code: courseCodes[0] })
     });
     return { ok: res.ok };
   }
