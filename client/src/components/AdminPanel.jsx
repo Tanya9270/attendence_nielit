@@ -77,17 +77,15 @@ export default function AdminPanel({ token }) {
           setMsgType('error'); setMsg(res.error || 'Failed to update teacher');
         }
       } else {
-        // send single course code (first selected or empty)
         const res = await api.createTeacher(token, tUsername, tPassword, (tCourseCodes && tCourseCodes[0]) || tCourseCode || '', tCourseName);
-        console.log('createTeacher response:', res);
-        if (res.ok) {
+        if (res && res.ok) {
           setMsgType('success');
           setMsg('Teacher created successfully');
           setTUsername(''); setTPassword(''); setTCourseCode(''); setTCourseCodes([]); setTCourseName('');
           loadLists();
         } else {
           setMsgType('error');
-          setMsg(res.error || 'Failed to create teacher');
+          setMsg(res && res.error ? res.error : 'Failed to create teacher');
         }
       }
     } catch (err) {
@@ -112,15 +110,14 @@ export default function AdminPanel({ token }) {
         }
       } else {
         const res = await api.createStudent(token, sRoll, sName, sCourseCodes, sPassword);
-        console.log('createStudent response:', res);
-        if (res.ok) {
+        if (res && res.ok) {
           setMsgType('success');
           setMsg('Student created successfully');
           setSRoll(''); setSName(''); setSCourse(''); setSCourseCodes([]); setSPassword('');
           loadStudents();
         } else {
           setMsgType('error');
-          setMsg(res.error || 'Failed to create student');
+          setMsg(res && res.error ? res.error : 'Failed to create student');
         }
       }
     } catch (err) {
