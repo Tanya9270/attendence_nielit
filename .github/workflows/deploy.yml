@@ -2,8 +2,7 @@ name: Deploy Backend and Database
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -11,21 +10,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          version: latest
+          node-version: '18'
+          cache: 'npm'
 
-      # Step 1: Update Database (Creates tables like 'profiles' automatically)
+      - name: Install Supabase CLI
+        run: npm install -g supabase@latest
+
+      - name: Check Supabase CLI version
+        run: supabase --version
+
       - name: Push Database Migrations
-        run: supabase db push --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} --password ${{ secrets.DB_PASSWORD }}
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          if [ -z "$SUPABASE_PROJECT_REF" ] || [ -z "$SUPABASE_DB_PASSWORD" ]; then
+            echo "Missing SUPABASE_PROJECT_REF or SUPABASE_DB_PASSWORD secrets" >&2
+            exit 1
+          fi
+          supabase db push --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
 
-      # Step 2: Update Edge Function (The attendance logic)
-      - name: Deploy mark-attendance function
-        run: supabase functions deploy mark-attendance --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} --no-verify-jwt
+      - name: Authenticate Supabase CLI (optional)
+        if: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          echo "$SUPABASE_ACCESS_TOKEN" | supabase login --stdin || true
+
+      - name: Deploy mark-attendance function
+        env:
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          if [ -z "$SUPABASE_PROJECT_REF" ]; then
+            echo "Missing SUPABASE_PROJECT_REF secret" >&2
+            exit 1
+          fi
+          supabase functions deploy mark-attendance --project-ref "$SUPABASE_PROJECT_REF"
