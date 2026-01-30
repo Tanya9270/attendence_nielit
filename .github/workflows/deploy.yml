@@ -1,4 +1,4 @@
-name: Deploy Edge Functions to Supabase
+name: Deploy Backend and Database
 
 on:
   push:
@@ -18,8 +18,14 @@ jobs:
         with:
           version: latest
 
+      # Step 1: Update Database (Creates tables like 'profiles' automatically)
+      - name: Push Database Migrations
+        run: supabase db push --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} --password ${{ secrets.DB_PASSWORD }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # Step 2: Update Edge Function (The attendance logic)
       - name: Deploy mark-attendance function
-        run: |
-          supabase functions deploy mark-attendance --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} --no-verify-jwt
+        run: supabase functions deploy mark-attendance --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} --no-verify-jwt
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
