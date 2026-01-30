@@ -7,21 +7,25 @@ export default function AdminPanel({ token }) {
   const [tCourseCode, setTCourseCode] = useState('');
   const [tCourseCodes, setTCourseCodes] = useState([]);
   const [tCourseName, setTCourseName] = useState('');
+  const [tNewCourseInput, setTNewCourseInput] = useState('');
+
   const [sRoll, setSRoll] = useState('');
   const [sName, setSName] = useState('');
   const [sPassword, setSPassword] = useState('');
-  const [sCourse, setSCourse] = useState('');
-  const [sCourseCodes, setSCourseCodes] = useState([]);
-  const [tNewCourseInput, setTNewCourseInput] = useState('');
   const [sNewCourseInput, setSNewCourseInput] = useState('');
+  const [sCourseCodes, setSCourseCodes] = useState([]);
+
   const [msg, setMsg] = useState('');
   const [msgType, setMsgType] = useState('success');
+
   const [teachers, setTeachers] = useState([]);
   const [courses, setCourses] = useState([]);
   const [students, setStudents] = useState([]);
+
   const [teacherQuery, setTeacherQuery] = useState('');
   const [studentQuery, setStudentQuery] = useState('');
   const [courseQuery, setCourseQuery] = useState('');
+
   const [editingTeacherId, setEditingTeacherId] = useState(null);
   const [editingStudentId, setEditingStudentId] = useState(null);
   const [editingStudentUsername, setEditingStudentUsername] = useState('');
@@ -54,18 +58,6 @@ export default function AdminPanel({ token }) {
       setMsgType('error'); setMsg('Failed to load students');
       setTimeout(() => setMsg(''), 4000);
     }
-  };
-
-  const deleteCourse = async (code) => {
-    if (!confirm('Delete this course? This will unset course for enrolled students.')) return;
-    try {
-      const res = await api.deleteCourse(token, code);
-      if (res && res.ok) loadLists();
-      else setMsg('Failed to delete course');
-    } catch (err) {
-      setMsg('Error deleting course');
-    }
-    setTimeout(() => setMsg(''), 3000);
   };
 
   const createTeacher = async (e) => {
@@ -106,8 +98,7 @@ export default function AdminPanel({ token }) {
         const res = await api.updateStudent(token, editingStudentId, { roll_number: sRoll, name: sName, course_codes: sCourseCodes, password: sPassword || undefined });
         if (res && res.ok) {
           setMsgType('success'); setMsg('Student updated');
-          setEditingStudentId(null); setSRoll(''); setSName(''); setSCourse(''); setSPassword('');
-          setSCourseCodes([]);
+          setEditingStudentId(null); setSRoll(''); setSName(''); setSCourseCodes([]); setSPassword('');
           loadStudents();
         } else {
           setMsgType('error'); setMsg(res.error || 'Failed to update student');
@@ -117,7 +108,7 @@ export default function AdminPanel({ token }) {
         if (res && res.ok) {
           setMsgType('success');
           setMsg('Student created successfully');
-          setSRoll(''); setSName(''); setSCourse(''); setSCourseCodes([]); setSPassword('');
+          setSRoll(''); setSName(''); setSCourseCodes([]); setSPassword('');
           loadStudents();
         } else {
           setMsgType('error');
@@ -177,7 +168,6 @@ export default function AdminPanel({ token }) {
   const startEditTeacher = (t) => {
     setEditingTeacherId(t.id);
     setTUsername(t.username || '');
-    setTCourseCode(t.course_code || '');
     setTCourseCodes(t.course_codes || (t.course_code ? [t.course_code] : []));
     setTCourseName(t.course_name || '');
     setTPassword('');
@@ -185,14 +175,13 @@ export default function AdminPanel({ token }) {
 
   const cancelEditTeacher = () => {
     setEditingTeacherId(null);
-    setTUsername(''); setTPassword(''); setTCourseCode(''); setTCourseCodes([]); setTCourseName('');
+    setTUsername(''); setTPassword(''); setTCourseCodes([]); setTCourseName('');
   };
 
   const startEditStudent = (s) => {
     setEditingStudentId(s.id);
     setSRoll(s.roll_number || '');
     setSName(s.name || '');
-    setSCourse(s.course_code || '');
     setSCourseCodes(s.course_codes || (s.course_code ? [s.course_code] : []));
     setSPassword('');
     setEditingStudentUsername(s.username || '');
@@ -200,7 +189,7 @@ export default function AdminPanel({ token }) {
 
   const cancelEditStudent = () => {
     setEditingStudentId(null);
-    setSRoll(''); setSName(''); setSCourse(''); setSCourseCodes([]); setSPassword('');
+    setSRoll(''); setSName(''); setSCourseCodes([]); setSPassword('');
     setEditingStudentUsername('');
   };
 
@@ -351,17 +340,20 @@ export default function AdminPanel({ token }) {
 
         <div>
           <div style={{ ...styles.card }}>
-            <h3 style={{ marginTop: 0, color: '#16325c' }}>Quick Lists</h3>
+            <h3 style={{ marginTop: 0, color: '#16325c' }}>Teachers (All)</h3>
 
-            <div style={{ marginBottom: 10 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
               <input style={styles.input} placeholder="Search teachers..." value={teacherQuery} onChange={e => setTeacherQuery(e.target.value)} />
+              <button style={styles.btnGhost} onClick={() => { setTeacherQuery(''); }}>Clear</button>
             </div>
-            <div style={{ maxHeight: 220, overflow: 'auto' }}>
+
+            <div style={{ maxHeight: 300, overflow: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead style={styles.tableHeader}>
                   <tr>
                     <th style={{ textAlign: 'left', padding: 8 }}>Username</th>
-                    <th style={{ textAlign: 'left', padding: 8 }}>Course</th>
+                    <th style={{ textAlign: 'left', padding: 8 }}>Courses</th>
+                    <th style={{ padding: 8 }}>Last Login</th>
                     <th style={{ padding: 8 }}>Actions</th>
                   </tr>
                 </thead>
@@ -370,6 +362,7 @@ export default function AdminPanel({ token }) {
                     <tr key={t.id} style={{ borderTop: '1px solid #f1f5fa' }}>
                       <td style={{ padding: 8, fontWeight: 700, color: '#0b5ed7' }}>{t.username}</td>
                       <td style={{ padding: 8 }}>{t.course_codes && t.course_codes.length ? t.course_codes.join(', ') : (t.course_code || '-')}</td>
+                      <td style={{ padding: 8 }}>{t.last_login_at ? new Date(t.last_login_at).toLocaleString() : '-'}</td>
                       <td style={{ padding: 8, textAlign: 'right' }}>
                         <button className="btn" style={styles.btnGhost} onClick={() => startEditTeacher(t)}>Edit</button>
                         <button className="btn" style={{ ...styles.btnGhost, marginLeft: 8 }} onClick={() => deleteTeacher(t.id)}>Delete</button>
@@ -380,16 +373,21 @@ export default function AdminPanel({ token }) {
               </table>
             </div>
 
-            <div style={{ marginTop: 12 }}>
-              <input style={styles.input} placeholder="Search students..." value={studentQuery} onChange={e => setStudentQuery(e.target.value)} />
+            <h3 style={{ marginTop: 14, color: '#16325c' }}>Students (All)</h3>
+
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <input style={styles.input} placeholder="Search students (roll, name, username)..." value={studentQuery} onChange={e => setStudentQuery(e.target.value)} />
+              <button style={styles.btnGhost} onClick={() => { setStudentQuery(''); }}>Clear</button>
             </div>
 
-            <div style={{ maxHeight: 220, overflow: 'auto', marginTop: 8 }}>
+            <div style={{ maxHeight: 300, overflow: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead style={styles.tableHeader}>
                   <tr>
                     <th style={{ textAlign: 'left', padding: 8 }}>Roll</th>
                     <th style={{ textAlign: 'left', padding: 8 }}>Name</th>
+                    <th style={{ textAlign: 'left', padding: 8 }}>Courses</th>
+                    <th style={{ padding: 8 }}>Username</th>
                     <th style={{ padding: 8 }}>Actions</th>
                   </tr>
                 </thead>
@@ -401,6 +399,8 @@ export default function AdminPanel({ token }) {
                     <tr key={s.id} style={{ borderTop: '1px solid #f1f5fa' }}>
                       <td style={{ padding: 8, fontWeight: 700, color: '#0b5ed7' }}>{s.roll_number}</td>
                       <td style={{ padding: 8 }}>{s.name}</td>
+                      <td style={{ padding: 8 }}>{(s.course_codes && s.course_codes.length) ? s.course_codes.join(', ') : (s.course_code || '-')}</td>
+                      <td style={{ padding: 8 }}>{s.username || '-'}</td>
                       <td style={{ padding: 8, textAlign: 'right' }}>
                         {s.username && <button className="btn" style={styles.btnGhost} onClick={() => copyToClipboard(s.username)}>Copy</button>}
                         <button className="btn" style={{ ...styles.btnGhost, marginLeft: 8 }} onClick={() => startEditStudent(s)}>Edit</button>
