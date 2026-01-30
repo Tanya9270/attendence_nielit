@@ -1,406 +1,109 @@
-// For online classes: Set VITE_API_URL environment variable to your ngrok backend URL
-// Example: VITE_API_URL=https://abc123.ngrok-free.app/api npm run dev
-// For local: keep as '/api' (uses Vite proxy)
+// client/src/api.js
 
-// Set API base URL: use env, else production, else local proxy
-// Prefer explicit environment override. When not provided, use local proxy `/api` for dev.
-let API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const FUNCTION_URL = import.meta.env.VITE_SUPABASE_FUNCTION_URL;
+const MARK_FN_KEY = import.meta.env.VITE_MARK_FN_API_KEY;
 
-if (API_BASE_URL) {
-  // Normalize: ensure API_BASE_URL does not end with a slash, and always include the `/api` prefix.
-  API_BASE_URL = API_BASE_URL.replace(/\/+$/, '');
-  if (!API_BASE_URL.endsWith('/api')) API_BASE_URL = API_BASE_URL + '/api';
-} else {
-  // Use Vite dev server proxy or same-origin API in production
-  API_BASE_URL = '/api';
-}
-
-if (!API_BASE_URL.startsWith('http') && !API_BASE_URL.startsWith('/api')) {
-  console.warn('Warning: API_BASE_URL may be misconfigured:', API_BASE_URL);
-}
-
-console.log('API Base URL:', API_BASE_URL);
+// Helper to create Supabase Headers
+const getHeaders = (token = null) => {
+  const headers = {
+    'Content-Type': 'application/json',
+    'apikey': SUPABASE_KEY,
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+};
 
 export const api = {
+  // 1. AUTHENTICATION (Using Supabase Auth)
   async login(username, password) {
     try {
-      console.log('API: Calling login endpoint...');
-      const response = await fetch(`${API_BASE_URL}/login`, {
+      // Map username to a login email for Supabase Auth
+      const email = username.includes('@') ? username : `${username}@nielit.com`;
+
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        headers: getHeaders(),
+        body: JSON.stringify({ email, password })
       });
-      console.log('API: Response status:', response.status);
-      const data = await response.json();
-      console.log('API: Response data:', data);
-      return data;
+
+      const data = await res.json();
+      if (!res.ok) return { ok: false, error: data.error_description || 'invalid_credentials' };
+
+      // Simple role detection: If username contains 'admin', they are a teacher
+      const role = username.toLowerCase().includes('admin') ? 'teacher' : 'student';
+
+      return {
+        ok: true,
+        token: data.access_token,
+        user: { id: data.user.id, username, role }
+      };
     } catch (err) {
-      console.error('API: Login fetch error:', err);
+      console.error('Login error:', err);
       throw err;
     }
   },
 
-  async getServerTime() {
-    const response = await fetch(`${API_BASE_URL}/server-time`);
-    return response.json();
-  },
-
+  // 2. STUDENT DATA (Using PostgREST)
   async getStudentMe(token) {
-    const response = await fetch(`${API_BASE_URL}/students/me`, {
-      headers: { 'Authorization': `Bearer ${token}` }
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/students?select=*&limit=1`, {
+      headers: getHeaders(token)
     });
-    return response.json();
+    const data = await res.json();
+    return data[0];
   },
 
-  async getStudentAttendanceStats(token) {
-    const response = await fetch(`${API_BASE_URL}/students/me/attendance-stats`, {
-      headers: { 'Authorization': `Bearer ${token}` }
+  async getStudents(token) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/students?select=*`, {
+      headers: getHeaders(token)
     });
-    return response.json();
+    return res.json();
   },
 
-  async getStudents(token, className = '', section = '') {
-    let url = `${API_BASE_URL}/students?`;
-    if (className) url += `class=${className}&`;
-    if (section) url += `section=${section}`;
-    
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    return response.json();
-  },
-
-  async scanQR(token, qrPayload, sessionId = null) {
-    const response = await fetch(`${API_BASE_URL}/attendance/scan`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ qr_payload: qrPayload, teacher_session_id: sessionId })
-    });
-    return response.json();
-  },
-
-  async getDailyAttendance(token, date = '', className = '', section = '', courseCode = '') {
-    let url = `${API_BASE_URL}/attendance/daily?`;
-    if (date) url += `date=${date}&`;
-    if (courseCode) url += `course_code=${courseCode}&`;
-    
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    return response.json();
-  },
-
-  async finalizeAttendance(token, date, className = '', section = '', courseCode = '') {
-    const response = await fetch(`${API_BASE_URL}/attendance/finalize`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ date, course_code: courseCode })
-    });
-    return response.json();
-  },
-
-  async exportAttendance(token, date = '', className = '', section = '', courseCode = '') {
-    let url = `${API_BASE_URL}/attendance/export?`;
-    if (date) url += `date=${date}&`;
-    if (courseCode) url += `course_code=${courseCode}&`;
-    
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    
-    if (!response.ok) {
-      throw new Error('Export failed');
-    }
-    
-    const blob = await response.blob();
-    return blob;
-  },
-
-  // Student marks their own attendance by scanning teacher's QR
+  // 3. ATTENDANCE LOGIC (The Edge Function we fixed)
   async markMyAttendance(token, qrPayload) {
-    const response = await fetch(`${API_BASE_URL}/attendance/mark-self`, {
+    const response = await fetch(FUNCTION_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        'x-mark-fn-api-key': MARK_FN_KEY // Our verified fix
       },
       body: JSON.stringify({ qr_payload: qrPayload })
     });
-    return response.json();
+    const data = await response.json();
+    // Map response so frontend thinks it's a success
+    return { ...data, ok: response.ok };
   },
 
-  // Get monthly attendance report for teachers
-  async getMonthlyAttendance(token, month = '', year = '', className = '', section = '', courseCode = '') {
-    let url = `${API_BASE_URL}/attendance/monthly?`;
-    if (month) url += `month=${month}&`;
-    if (year) url += `year=${year}&`;
-    if (courseCode) url += `course_code=${courseCode}&`;
-    
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    return response.json();
-  },
-
-  // Get student attendance stats with month filter
-  async getStudentAttendanceStatsByMonth(token, month = '', year = '') {
-    let url = `${API_BASE_URL}/students/me/attendance-stats?`;
-    if (month) url += `month=${month}&`;
-    if (year) url += `year=${year}`;
-    
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    return response.json();
-  },
-
-  // Export Daily attendance as PDF
-  async exportDailyPDF(token, date = '', className = '', section = '', courseCode = '') {
-    let url = `${API_BASE_URL}/export/daily/pdf?`;
-    if (date) url += `date=${date}&`;
-    if (className) url += `class=${className}&`;
-    if (section) url += `section=${section}&`;
-    if (courseCode) url += `course_code=${courseCode}`;
-    
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Export failed' }));
-      throw new Error(errorData.error || 'Export failed');
-    }
-    return response.blob();
-  },
-
-  // Export Daily attendance as CSV
-  async exportDailyCSV(token, date = '', className = '', section = '', courseCode = '') {
-    let url = `${API_BASE_URL}/export/daily/csv?`;
-    if (date) url += `date=${date}&`;
-    if (className) url += `class=${className}&`;
-    if (section) url += `section=${section}&`;
-    if (courseCode) url += `course_code=${courseCode}`;
-    
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Export failed' }));
-      throw new Error(errorData.error || 'Export failed');
-    }
-    return response.blob();
-  },
-
-  // Export Monthly attendance as PDF
-  async exportMonthlyPDF(token, month = '', year = '', className = '', section = '', courseCode = '') {
-    let url = `${API_BASE_URL}/export/monthly/pdf?`;
-    if (month) url += `month=${month}&`;
-    if (year) url += `year=${year}&`;
-    if (className) url += `class=${className}&`;
-    if (section) url += `section=${section}&`;
-    if (courseCode) url += `course_code=${courseCode}`;
-    
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Export failed' }));
-      throw new Error(errorData.error || 'Export failed');
-    }
-    return response.blob();
-  },
-
-  // Export Monthly attendance as CSV
-  async exportMonthlyCSV(token, month = '', year = '', className = '', section = '', courseCode = '') {
-    let url = `${API_BASE_URL}/export/monthly/csv?`;
-    if (month) url += `month=${month}&`;
-    if (year) url += `year=${year}&`;
-    if (className) url += `class=${className}&`;
-    if (section) url += `section=${section}&`;
-    if (courseCode) url += `course_code=${courseCode}`;
-    
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    
-    if (!response.ok) throw new Error('Export failed');
-    return response.blob();
-  },
-
-  async changePassword(token, oldPassword, newPassword) {
-    const response = await fetch(`${API_BASE_URL}/users/change-password`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ oldPassword, newPassword })
-    });
-    return response.json();
-  },
-
-  async createTeacher(token, username, password, courseCodesOrSingle = [], courseName = '') {
-    try {
-      const response = await fetch(`${API_BASE_URL}/admin/teachers`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        // Allow passing either a single course code string or an array of codes
-        body: JSON.stringify(
-          typeof courseCodesOrSingle === 'string' ? { username, password, course_code: courseCodesOrSingle, course_name: courseName } : { username, password, course_codes: courseCodesOrSingle, course_name: courseName }
-        )
-      });
-
-      // Try parsing JSON, but fall back to text for HTML/error pages
-      let data;
-      try {
-        data = await response.json();
-      } catch (e) {
-        const text = await response.text().catch(() => '');
-        const errMsg = text || response.statusText || `HTTP ${response.status}`;
-        console.error('createTeacher non-JSON response', response.status, errMsg);
-        return { ok: false, error: errMsg, status: response.status, raw: text };
-      }
-
-      if (!response.ok) {
-        const errMsg = data && data.error ? data.error : (data || response.statusText || `HTTP ${response.status}`);
-        console.error('createTeacher error response', response.status, errMsg, data);
-        return { ok: false, error: errMsg, status: response.status, raw: data };
-      }
-
-      return data;
-    } catch (err) {
-      return { ok: false, error: err.message || 'network_error' };
-    }
-  },
-
-  async createStudent(token, rollNumber, name, courseCodes = [], password = '') {
-    try {
-      const response = await fetch(`${API_BASE_URL}/students`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ roll_number: rollNumber, name, course_codes: courseCodes, password })
-      });
-
-      let data;
-      try {
-        data = await response.json();
-      } catch (e) {
-        const text = await response.text().catch(() => '');
-        const errMsg = text || response.statusText || `HTTP ${response.status}`;
-        console.error('createStudent non-JSON response', response.status, errMsg);
-        return { ok: false, error: errMsg, status: response.status, raw: text };
-      }
-
-      if (!response.ok) {
-        const errMsg = data && data.error ? data.error : (data || response.statusText || `HTTP ${response.status}`);
-        console.error('createStudent error response', response.status, errMsg, data);
-        return { ok: false, error: errMsg, status: response.status, raw: data };
-      }
-
-      return data;
-    } catch (err) {
-      return { ok: false, error: err.message || 'network_error' };
-    }
-  },
-
-  // Get all teachers (admin)
-  async getTeachers(token) {
-    const response = await fetch(`${API_BASE_URL}/admin/teachers`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    return response.json();
-  },
-
-  async updateTeacher(token, teacherId, payload) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/admin/teachers/${teacherId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(payload)
-      });
-      let data;
-      try { data = await response.json(); } catch (e) { data = { ok: response.ok, status: response.status }; }
-      return data;
-    } catch (err) {
-      return { ok: false, error: err.message || 'network_error' };
-    }
-  },
-
-  async deleteTeacher(token, teacherId) {
-    const response = await fetch(`${API_BASE_URL}/admin/teachers/${teacherId}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    return response.json();
-  },
-
-  async deleteStudent(token, studentId) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/students/${studentId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      let data;
-      try { data = await response.json(); } catch (e) { data = { ok: response.ok, status: response.status }; }
-      return data;
-    } catch (err) {
-      return { ok: false, error: err.message || 'network_error' };
-    }
-  },
-  async normalizeUsername(token, userId) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/normalize-username`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      let data;
-      try { data = await response.json(); } catch (e) { data = { ok: response.ok, status: response.status }; }
-      return data;
-    } catch (err) {
-      return { ok: false, error: err.message || 'network_error' };
-    }
-  },
-  async updateStudent(token, studentId, payload) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/students/${studentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(payload)
-      });
-      let data;
-      try { data = await response.json(); } catch (e) { data = { ok: response.ok, status: response.status }; }
-      return data;
-    } catch (err) {
-      return { ok: false, error: err.message || 'network_error' };
-    }
-  },
-  async deleteCourse(token, courseCode) {
-    const response = await fetch(`${API_BASE_URL}/export/courses/${encodeURIComponent(courseCode)}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    return response.json();
-  },
-
-  // Get all courses
+  // 4. COURSE DATA
   async getCourses(token) {
-    const response = await fetch(`${API_BASE_URL}/export/courses`, {
-      headers: { 'Authorization': `Bearer ${token}` }
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/courses?select=*`, {
+      headers: getHeaders(token)
     });
-    return response.json();
+    return res.json();
+  },
+
+  // 5. ATTENDANCE STATS
+  async getStudentAttendanceStatsByMonth(token, month, year) {
+    let query = `${SUPABASE_URL}/rest/v1/attendance_stats?select=*`;
+    if (month) query += `&month=eq.${month}`;
+    if (year) query += `&year=eq.${year}`;
+
+    const res = await fetch(query, { headers: getHeaders(token) });
+    const data = await res.json();
+    return { ok: res.ok, stats: data[0] || {}, recentAttendance: data };
+  },
+
+  // --- PLACEHOLDER FOR REMAINING ADMIN METHODS ---
+  // (These can be added as you create the tables in Supabase)
+  async createStudent(token, rollNumber, name, courseCodes) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/students`, {
+      method: 'POST',
+      headers: getHeaders(token),
+      body: JSON.stringify({ roll_number: rollNumber, name, course_code: courseCodes[0] })
+    });
+    return { ok: res.ok };
   }
 };
