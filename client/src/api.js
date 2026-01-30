@@ -59,6 +59,8 @@ export const api = {
 
   // --- 2. STUDENT DATA ---
   async getStudentMe(token) {
+    // Note: Currently this fetches the first student found. 
+    // To fix the "Swati" bug permanently, you will need to link auth.users to students table later.
     const res = await fetch(`${SUPABASE_URL}/rest/v1/students?select=*&limit=1`, {
       headers: getHeaders(token)
     });
@@ -117,7 +119,7 @@ export const api = {
     return { ok: true, data: data };
   },
 
-  // --- 7. ADMIN ACTION METHODS (UPDATED) ---
+  // --- 7. ADMIN ACTION METHODS ---
 
   // Get all teachers
   async getTeachers(token) {
