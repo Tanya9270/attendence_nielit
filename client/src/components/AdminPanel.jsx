@@ -217,9 +217,8 @@ export default function AdminPanel({ token }) {
   };
 
   const copySupabaseSignup = () => {
-    // Provide admin/server-side curl example (do not run client-side)
     const url = import.meta.env.VITE_SUPABASE_URL || '<SUPABASE_URL>';
-    const svcKey = '<SERVICE_ROLE_KEY>'; // DO NOT embed on client - for admin only
+    const svcKey = '<SERVICE_ROLE_KEY>';
     const curl = `curl -X POST '${url}/auth/v1/admin/users' \\
   -H "apikey: ${svcKey}" \\
   -H "Content-Type: application/json" \\
