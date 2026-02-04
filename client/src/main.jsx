@@ -5,6 +5,8 @@ import './index.css';
 import Login from './components/Login';
 import StudentPortal from './components/StudentPortal';
 import TeacherPortal from './components/TeacherPortal';
+// IMPORT the AdminPanel component
+import AdminPanel from './components/AdminPanel'; 
 
 function ProtectedRoute({ children, allowedRoles }) {
   const token = localStorage.getItem('token');
@@ -15,6 +17,7 @@ function ProtectedRoute({ children, allowedRoles }) {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
+    // If they try to access a page they aren't allowed to, send them to login
     return <Navigate to="/" replace />;
   }
 
@@ -26,6 +29,18 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login />} />
+        
+        {/* 1. Dedicated Admin Route */}
+        <Route 
+          path="/admin" 
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminPanel />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* 2. Student Route */}
         <Route 
           path="/student" 
           element={
@@ -34,14 +49,18 @@ function App() {
             </ProtectedRoute>
           } 
         />
+
+        {/* 3. Teacher Route */}
         <Route 
           path="/teacher" 
           element={
-            <ProtectedRoute allowedRoles={['teacher', 'admin']}>
+            <ProtectedRoute allowedRoles={['teacher']}>
               <TeacherPortal />
             </ProtectedRoute>
           } 
         />
+
+        {/* Catch-all: redirect to login */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

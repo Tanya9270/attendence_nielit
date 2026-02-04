@@ -20,13 +20,20 @@ export default function Login() {
       console.log('Login result:', result);
 
       if (result.ok) {
+        // Clear old data first to avoid session mixing
+        localStorage.clear();
+        
         localStorage.setItem('token', result.token);
         localStorage.setItem('user', JSON.stringify(result.user));
 
-        if (result.user.role === 'student') {
-          navigate('/student');
-        } else if (result.user.role === 'teacher' || result.user.role === 'admin') {
+        // UPDATED REDIRECTION LOGIC
+        // We now separate admin, teacher, and student to their own specific portals
+        if (result.user.role === 'admin') {
+          navigate('/admin');
+        } else if (result.user.role === 'teacher') {
           navigate('/teacher');
+        } else if (result.user.role === 'student') {
+          navigate('/student');
         }
       } else {
         setError(result.error === 'invalid_credentials' ? 'Invalid username or password' : 'Login failed: ' + (result.error || 'Unknown error'));
@@ -48,7 +55,6 @@ export default function Login() {
       background: 'linear-gradient(135deg, #0066B3 0%, #00A0E3 100%)'
     }}>
       <div className="card" style={{ maxWidth: '420px', width: '100%', margin: '20px', padding: '30px' }}>
-        {/* NIELIT Logo */}
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
           <img 
             src="/nielit-logo.svg" 
