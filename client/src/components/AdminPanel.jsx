@@ -79,7 +79,6 @@ export default function AdminPanel() {
     }
   }
 
-  // Filter logic updated to match Supabase column names
   const filteredTeachers = teachers.filter(t =>
     (t.teacher_name || '').toLowerCase().includes(teacherSearch.toLowerCase()) ||
     (t.course_code || '').toLowerCase().includes(teacherSearch.toLowerCase())
@@ -176,4 +175,27 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        {/* Students Lis
+        {/* Students List */}
+        <div>
+          <h3 style={{ marginBottom: '15px' }}>Enrolled Students</h3>
+          <div className="form-group">
+            <input type="text" placeholder="Search students or rolls..." value={studentSearch} onChange={e => setStudentSearch(e.target.value)} />
+          </div>
+          <div className="admin-data-list">
+            {filteredStudents.map((s) => (
+              <div key={s.roll_number} className="data-card student-card">
+                <div>
+                  <div className="card-title">👨‍🎓 {s.name}</div>
+                  <div className="card-subtitle">Roll: {s.roll_number}</div>
+                </div>
+                <span className="course-badge">{s.course_code}</span>
+              </div>
+            ))}
+            {filteredStudents.length === 0 && <p className="text-center">No students found</p>}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
