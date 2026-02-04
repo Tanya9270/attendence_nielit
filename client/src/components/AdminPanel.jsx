@@ -1,423 +1,275 @@
-﻿import { useState, useEffect } from 'react';
+﻿// client/src/components/AdminPanel.jsx
+import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 
-export default function AdminPanel({ token }) {
-  const [tUsername, setTUsername] = useState('');
-  const [tPassword, setTPassword] = useState('');
-  const [tCourseCode, setTCourseCode] = useState('');
-  const [tCourseCodes, setTCourseCodes] = useState([]);
-  const [tCourseName, setTCourseName] = useState('');
-  const [tNewCourseInput, setTNewCourseInput] = useState('');
+const srOnly = {
+  position: 'absolute',
+  width: '1px',
+  height: '1px',
+  padding: 0,
+  margin: '-1px',
+  overflow: 'hidden',
+  clip: 'rect(0,0,0,0)',
+  whiteSpace: 'nowrap',
+  border: 0,
+};
 
-  const [sRoll, setSRoll] = useState('');
-  const [sName, setSName] = useState('');
-  const [sPassword, setSPassword] = useState('');
-  const [sNewCourseInput, setSNewCourseInput] = useState('');
-  const [sCourseCodes, setSCourseCodes] = useState([]);
-
-  const [msg, setMsg] = useState('');
-  const [msgType, setMsgType] = useState('success');
-
+export default function AdminPanel() {
+  const [token, setToken] = useState(null);
   const [teachers, setTeachers] = useState([]);
-  const [courses, setCourses] = useState([]);
   const [students, setStudents] = useState([]);
+  const [courses, setCourses] = useState([]);
 
-  const [teacherQuery, setTeacherQuery] = useState('');
-  const [studentQuery, setStudentQuery] = useState('');
-  const [courseQuery, setCourseQuery] = useState('');
+  // Teacher form
+  const [teacherUsername, setTeacherUsername] = useState('');
+  const [teacherPassword, setTeacherPassword] = useState('');
+  const [teacherCourseCode, setTeacherCourseCode] = useState('');
+  const [teacherCourseName, setTeacherCourseName] = useState('');
 
-  const [editingTeacherId, setEditingTeacherId] = useState(null);
-  const [editingStudentId, setEditingStudentId] = useState(null);
-  const [editingStudentUsername, setEditingStudentUsername] = useState('');
-  const [normalizingIds, setNormalizingIds] = useState([]);
+  // Student form
+  const [studentRoll, setStudentRoll] = useState('');
+  const [studentName, setStudentName] = useState('');
+  const [studentCourseCode, setStudentCourseCode] = useState('');
+
+  // Search filters
+  const [teacherSearch, setTeacherSearch] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
 
   useEffect(() => {
-    loadLists();
-    loadStudents();
+    loadAll();
   }, []);
 
-  const loadLists = async () => {
+  async function loadAll() {
     try {
       const t = await api.getTeachers(token);
-      if (t && t.ok) setTeachers(t.teachers || []);
-      const c = await api.getCourses(token);
-      if (c && c.ok) setCourses(c.courses || c || []);
-    } catch (err) {
-      console.error('Failed to load lists', err);
-      setMsgType('error'); setMsg('Failed to load teacher/course lists');
-      setTimeout(() => setMsg(''), 4000);
-    }
-  };
-
-  const loadStudents = async () => {
-    try {
       const s = await api.getStudents(token);
-      if (s) setStudents(s || []);
+      const c = await api.getCourses(token);
+      setTeachers(Array.isArray(t) ? t : []);
+      setStudents(Array.isArray(s) ? s : []);
+      setCourses(Array.isArray(c) ? c : []);
     } catch (err) {
-      console.error('Failed to load students', err);
-      setMsgType('error'); setMsg('Failed to load students');
-      setTimeout(() => setMsg(''), 4000);
+      console.error('loadAll error', err);
     }
-  };
+  }
 
-  const createTeacher = async (e) => {
+  async function handleCreateTeacher(e) {
     e.preventDefault();
     try {
-      if (editingTeacherId) {
-        const res = await api.updateTeacher(token, editingTeacherId, { username: tUsername, password: tPassword || undefined, course_codes: tCourseCodes, course_name: tCourseName });
-        if (res && res.ok) {
-          setMsgType('success'); setMsg('Teacher updated');
-          setEditingTeacherId(null); setTUsername(''); setTPassword(''); setTCourseCode(''); setTCourseName('');
-          loadLists();
-        } else {
-          setMsgType('error'); setMsg(res.error || 'Failed to update teacher');
-        }
+      const res = await api.createTeacher(token, teacherUsername, teacherPassword, teacherCourseCode, teacherCourseName);
+      if (res.ok) {
+        setTeacherUsername('');
+        setTeacherPassword('');
+        setTeacherCourseCode('');
+        setTeacherCourseName('');
+        await loadAll();
       } else {
-        const res = await api.createTeacher(token, tUsername, tPassword, (tCourseCodes && tCourseCodes[0]) || tCourseCode || '', tCourseName);
-        if (res && res.ok) {
-          setMsgType('success');
-          setMsg('Teacher created successfully');
-          setTUsername(''); setTPassword(''); setTCourseCode(''); setTCourseCodes([]); setTCourseName('');
-          loadLists();
-        } else {
-          setMsgType('error');
-          setMsg(res && res.error ? res.error : 'Failed to create teacher');
-        }
+        console.error('createTeacher failed', res);
+        alert(`Create teacher failed: ${res.status || 'error'}`);
       }
     } catch (err) {
-      setMsgType('error');
-      setMsg('Error creating/updating teacher');
+      console.error(err);
+      alert('Network error while creating teacher');
     }
-    setTimeout(() => setMsg(''), 4000);
-  };
+  }
 
-  const createStudent = async (e) => {
+  async function handleCreateStudent(e) {
     e.preventDefault();
     try {
-      if (editingStudentId) {
-        const res = await api.updateStudent(token, editingStudentId, { roll_number: sRoll, name: sName, course_codes: sCourseCodes, password: sPassword || undefined });
-        if (res && res.ok) {
-          setMsgType('success'); setMsg('Student updated');
-          setEditingStudentId(null); setSRoll(''); setSName(''); setSCourseCodes([]); setSPassword('');
-          loadStudents();
-        } else {
-          setMsgType('error'); setMsg(res.error || 'Failed to update student');
-        }
+      const res = await api.createStudent(token, studentRoll, studentName, [studentCourseCode]);
+      if (res.ok) {
+        setStudentRoll('');
+        setStudentName('');
+        setStudentCourseCode('');
+        await loadAll();
       } else {
-        const res = await api.createStudent(token, sRoll, sName, sCourseCodes, sPassword);
-        if (res && res.ok) {
-          setMsgType('success');
-          setMsg('Student created successfully');
-          setSRoll(''); setSName(''); setSCourseCodes([]); setSPassword('');
-          loadStudents();
-        } else {
-          setMsgType('error');
-          setMsg(res && res.error ? res.error : 'Failed to create student');
-        }
+        console.error('createStudent failed', res);
+        alert(`Create student failed: ${res.status || 'error'}`);
       }
     } catch (err) {
-      setMsgType('error');
-      setMsg('Error creating/updating student');
+      console.error(err);
+      alert('Network error while creating student');
     }
-    setTimeout(() => setMsg(''), 4000);
-  };
+  }
 
-  const deleteTeacher = async (id) => {
-    if (!confirm('Delete this teacher?')) return;
-    try {
-      const res = await api.deleteTeacher(token, id);
-      if (res && res.ok) loadLists();
-      else setMsg('Failed to delete teacher');
-    } catch (err) {
-      setMsg('Error deleting teacher');
-    }
-    setTimeout(() => setMsg(''), 3000);
-  };
+  const filteredTeachers = teachers.filter(t =>
+    (t.username || '').toLowerCase().includes(teacherSearch.toLowerCase())
+  );
 
-  const deleteStudent = async (id) => {
-    if (!confirm('Delete this student?')) return;
-    try {
-      const res = await api.deleteStudent(token, id);
-      if (res && res.ok) loadStudents();
-      else setMsg('Failed to delete student');
-    } catch (err) {
-      setMsg('Error deleting student');
-    }
-    setTimeout(() => setMsg(''), 3000);
-  };
-
-  const normalizeStudent = async (id) => {
-    if (!confirm('Normalize this student username?')) return;
-    try {
-      setNormalizingIds(prev => [...prev, id]);
-      const res = await api.normalizeUsername(token, id);
-      if (res && res.ok) {
-        setMsgType('success'); setMsg('Username normalized');
-        loadStudents();
-      } else {
-        setMsgType('error'); setMsg(res && res.error ? res.error : 'Normalization failed');
-      }
-    } catch (err) {
-      setMsgType('error'); setMsg('Error normalizing username');
-    } finally {
-      setNormalizingIds(prev => prev.filter(x => x !== id));
-      setTimeout(() => setMsg(''), 3000);
-    }
-  };
-
-  const startEditTeacher = (t) => {
-    setEditingTeacherId(t.id);
-    setTUsername(t.username || '');
-    setTCourseCodes(t.course_codes || (t.course_code ? [t.course_code] : []));
-    setTCourseName(t.course_name || '');
-    setTPassword('');
-  };
-
-  const cancelEditTeacher = () => {
-    setEditingTeacherId(null);
-    setTUsername(''); setTPassword(''); setTCourseCodes([]); setTCourseName('');
-  };
-
-  const startEditStudent = (s) => {
-    setEditingStudentId(s.id);
-    setSRoll(s.roll_number || '');
-    setSName(s.name || '');
-    setSCourseCodes(s.course_codes || (s.course_code ? [s.course_code] : []));
-    setSPassword('');
-    setEditingStudentUsername(s.username || '');
-  };
-
-  const cancelEditStudent = () => {
-    setEditingStudentId(null);
-    setSRoll(''); setSName(''); setSCourseCodes([]); setSPassword('');
-    setEditingStudentUsername('');
-  };
-
-  const copyToClipboard = async (text) => {
-    try {
-      if (!text) return;
-      await navigator.clipboard.writeText(text);
-      setMsgType('success'); setMsg('Copied to clipboard');
-      setTimeout(() => setMsg(''), 2000);
-    } catch (err) {
-      setMsgType('error'); setMsg('Copy failed');
-      setTimeout(() => setMsg(''), 2000);
-    }
-  };
-
-  const styles = {
-    container: { padding: 28, maxWidth: 1200, margin: '0 auto', fontFamily: "'Segoe UI', Roboto, Arial, sans-serif", color: '#233' },
-    header: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 },
-    title: { fontSize: 28, fontWeight: 700, color: '#0b5ed7' },
-    subtitle: { color: '#5a6b83' },
-    card: { background: '#ffffff', padding: 20, borderRadius: 10, boxShadow: '0 8px 20px rgba(18,38,63,0.06)', marginBottom: 16 },
-    cols: { display: 'grid', gridTemplateColumns: '1fr 380px', gap: 18 },
-    formRow: { display: 'flex', gap: 10, marginBottom: 10, alignItems: 'center' },
-    label: { width: 120, color: '#33475b', fontWeight: 600 },
-    input: { padding: 10, borderRadius: 8, border: '1px solid #d7e0ea', width: '100%', boxShadow: 'inset 0 1px 2px rgba(16,24,40,0.03)' },
-    select: { padding: 10, borderRadius: 8, border: '1px solid #d7e0ea', width: '100%', background: '#fff' },
-    btnPrimary: { padding: '10px 14px', background: '#0b5ed7', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' },
-    btnGhost: { padding: '8px 12px', background: '#f6f9fc', color: '#123', border: '1px solid #e6eef6', borderRadius: 8, cursor: 'pointer' },
-    smallMuted: { fontSize: 12, color: '#7b8794' },
-    tableHeader: { background: '#f0f6ff', color: '#0b5ed7', fontWeight: 700 }
-  };
+  const filteredStudents = students.filter(s =>
+    (s.name || '').toLowerCase().includes(studentSearch.toLowerCase())
+  );
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <div style={styles.title}>Admin Portal</div>
-        <div style={styles.subtitle}>Manage teachers · students · courses</div>
-        <div style={{ marginLeft: 'auto' }}>
-          <button style={styles.btnGhost} onClick={() => { loadLists(); loadStudents(); }}>Refresh Data</button>
+    <div style={{ padding: 20, fontFamily: 'system-ui, Arial' }}>
+      <h1>Admin Panel</h1>
+
+      <section style={{ display: 'flex', gap: 24, marginBottom: 24 }}>
+        <div style={{ flex: 1, padding: 12, border: '1px solid #e2e2e2', borderRadius: 8 }}>
+          <h2 style={{ marginTop: 0 }}>Create Teacher</h2>
+          <form onSubmit={handleCreateTeacher}>
+            <div style={{ marginBottom: 8 }}>
+              <label htmlFor="teacher-username">Username</label>
+              <input
+                id="teacher-username"
+                name="teacherUsername"
+                type="text"
+                placeholder="e.g. john.doe"
+                value={teacherUsername}
+                onChange={e => setTeacherUsername(e.target.value)}
+                required
+                style={{ width: '100%', padding: 8, marginTop: 4 }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 8 }}>
+              <label htmlFor="teacher-password">Password</label>
+              <input
+                id="teacher-password"
+                name="teacherPassword"
+                type="password"
+                placeholder="password"
+                value={teacherPassword}
+                onChange={e => setTeacherPassword(e.target.value)}
+                required
+                style={{ width: '100%', padding: 8, marginTop: 4 }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 8 }}>
+              <label htmlFor="teacher-course-code">Course Code</label>
+              <input
+                id="teacher-course-code"
+                name="teacherCourseCode"
+                type="text"
+                placeholder="COURSE101"
+                value={teacherCourseCode}
+                onChange={e => setTeacherCourseCode(e.target.value)}
+                style={{ width: '100%', padding: 8, marginTop: 4 }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 8 }}>
+              <label htmlFor="teacher-course-name">Course Name</label>
+              <input
+                id="teacher-course-name"
+                name="teacherCourseName"
+                type="text"
+                placeholder="Course name"
+                value={teacherCourseName}
+                onChange={e => setTeacherCourseName(e.target.value)}
+                style={{ width: '100%', padding: 8, marginTop: 4 }}
+              />
+            </div>
+
+            <button type="submit" style={{ padding: '8px 12px' }}>Create Teacher</button>
+          </form>
         </div>
-      </div>
 
-      {msg && (
-        <div style={{ ...styles.card, background: msgType === 'success' ? '#f0fff4' : '#fff4f4', border: msgType === 'success' ? '1px solid #d1f3d8' : '1px solid #f5c6cb' }}>
-          {msg}
+        <div style={{ flex: 1, padding: 12, border: '1px solid #e2e2e2', borderRadius: 8 }}>
+          <h2 style={{ marginTop: 0 }}>Create Student</h2>
+          <form onSubmit={handleCreateStudent}>
+            <div style={{ marginBottom: 8 }}>
+              <label htmlFor="student-roll">Roll Number</label>
+              <input
+                id="student-roll"
+                name="studentRoll"
+                type="text"
+                placeholder="Roll number"
+                value={studentRoll}
+                onChange={e => setStudentRoll(e.target.value)}
+                required
+                style={{ width: '100%', padding: 8, marginTop: 4 }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 8 }}>
+              <label htmlFor="student-name">Name</label>
+              <input
+                id="student-name"
+                name="studentName"
+                type="text"
+                placeholder="Full name"
+                value={studentName}
+                onChange={e => setStudentName(e.target.value)}
+                required
+                style={{ width: '100%', padding: 8, marginTop: 4 }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 8 }}>
+              <label htmlFor="student-course">Course</label>
+              <select
+                id="student-course"
+                name="studentCourseCode"
+                value={studentCourseCode}
+                onChange={e => setStudentCourseCode(e.target.value)}
+                style={{ width: '100%', padding: 8, marginTop: 4 }}
+              >
+                <option value="">Select course (optional)</option>
+                {courses.map(c => (
+                  <option key={c.code ?? c.id} value={c.code ?? c.id}>
+                    {c.name ?? c.course_name ?? c.code}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button type="submit" style={{ padding: '8px 12px' }}>Create Student</button>
+          </form>
         </div>
-      )}
+      </section>
 
-      <div style={styles.cols}>
-        <div>
-          <div style={styles.card}>
-            <h2 style={{ marginTop: 0, color: '#16325c' }}>Add / Edit Teacher</h2>
-            <form onSubmit={createTeacher}>
-              <div style={styles.formRow}>
-                <label style={styles.label}>Username</label>
-                <input style={styles.input} value={tUsername} onChange={e => setTUsername(e.target.value)} required />
-              </div>
-              <div style={styles.formRow}>
-                <label style={styles.label}>Password</label>
-                <input type="password" style={styles.input} value={tPassword} onChange={e => setTPassword(e.target.value)} required />
-              </div>
-              <div style={styles.formRow}>
-                <label style={styles.label}>Course</label>
-                <input style={styles.input} value={tCourseName} onChange={e => setTCourseName(e.target.value)} placeholder="Course name (optional)" />
-              </div>
-
-              <div style={{ ...styles.formRow, alignItems: 'flex-start' }}>
-                <label style={styles.label}>Course Codes</label>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                    <select style={styles.select} value={(tCourseCodes && tCourseCodes[0]) || ''} onChange={e => { const v = e.target.value; if (!v) return; setTCourseCodes([v]); }}>
-                      <option value="">-- select existing course --</option>
-                      {courses.map(c => <option key={c.course_code} value={c.course_code}>{c.course_code}{c.course_name ? ` - ${c.course_name}` : ''}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input style={styles.input} placeholder="Add new code" value={tNewCourseInput} onChange={e => setTNewCourseInput(e.target.value)} />
-                    <button type="button" style={styles.btnGhost} onClick={() => { const v = (tNewCourseInput || '').trim(); if (!v) return; setTCourseCodes([v]); setTNewCourseInput(''); }}>Add</button>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                <button type="submit" style={styles.btnPrimary}>{editingTeacherId ? 'Save Changes' : 'Create Teacher'}</button>
-                {editingTeacherId && <button type="button" style={styles.btnGhost} onClick={cancelEditTeacher}>Cancel</button>}
-                <div style={{ marginLeft: 'auto', ...styles.smallMuted }}>Records are stored in the application backend.</div>
-              </div>
-            </form>
+      <section style={{ display: 'flex', gap: 24 }}>
+        <div style={{ flex: 1 }}>
+          <h3>Teachers</h3>
+          <div style={{ marginBottom: 8 }}>
+            <label htmlFor="teacher-search" style={srOnly}>Search teachers</label>
+            <input
+              id="teacher-search"
+              name="teacherSearch"
+              placeholder="Search teachers..."
+              value={teacherSearch}
+              onChange={e => setTeacherSearch(e.target.value)}
+              style={{ width: '100%', padding: 8 }}
+            />
           </div>
 
-          <div style={{ ...styles.card, marginTop: 14 }}>
-            <h2 style={{ marginTop: 0, color: '#16325c' }}>Add / Edit Student</h2>
-            <form onSubmit={createStudent}>
-              <div style={styles.formRow}>
-                <label style={styles.label}>Roll</label>
-                <input style={styles.input} value={sRoll} onChange={e => setSRoll(e.target.value)} required />
-              </div>
-
-              {editingStudentId && (
-                <div style={styles.formRow}>
-                  <label style={styles.label}>Username</label>
-                  <input style={{ ...styles.input, background: '#f8fafc' }} value={editingStudentUsername} readOnly disabled />
-                  <button type="button" style={styles.btnGhost} onClick={() => copyToClipboard(editingStudentUsername)}>Copy</button>
-                </div>
-              )}
-
-              <div style={styles.formRow}>
-                <label style={styles.label}>Name</label>
-                <input style={styles.input} value={sName} onChange={e => setSName(e.target.value)} required />
-              </div>
-              <div style={styles.formRow}>
-                <label style={styles.label}>Password</label>
-                <input type="password" style={styles.input} value={sPassword} onChange={e => setSPassword(e.target.value)} placeholder="Leave blank to use roll" />
-              </div>
-
-              <div style={{ ...styles.formRow, alignItems: 'flex-start' }}>
-                <label style={styles.label}>Course Codes</label>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                    {(sCourseCodes || []).map(cc => (
-                      <div key={cc} style={{ background: '#eef6ff', padding: '6px 8px', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                        <strong style={{ color: '#0b5ed7' }}>{cc}</strong>
-                        <button type="button" className="btn" style={styles.btnGhost} onClick={() => setSCourseCodes(prev => prev.filter(x => x !== cc))}>×</button>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <select style={{ ...styles.select, flex: 1 }} value={''} onChange={e => { const v = e.target.value; if (!v) return; if (!sCourseCodes.includes(v)) setSCourseCodes(prev => [...prev, v]); e.target.value = ''; }}>
-                      <option value="">-- add from existing courses --</option>
-                      {courses.map(c => <option key={c.course_code} value={c.course_code}>{c.course_code}{c.course_name ? ` - ${c.course_name}` : ''}</option>)}
-                    </select>
-                    <input style={{ ...styles.input, width: 160 }} placeholder="Add new code" value={sNewCourseInput} onChange={e => setSNewCourseInput(e.target.value)} onKeyDown={e => {
-                      if (e.key === 'Enter') { e.preventDefault(); const v = (sNewCourseInput || '').trim(); if (!v) return; if (!sCourseCodes.includes(v)) setSCourseCodes(prev => [...prev, v]); setSNewCourseInput(''); }
-                    }} />
-                    <button type="button" style={styles.btnGhost} onClick={() => { const v = (sNewCourseInput || '').trim(); if (!v) return; if (!sCourseCodes.includes(v)) setSCourseCodes(prev => [...prev, v]); setSNewCourseInput(''); }}>Add</button>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                <button type="submit" style={styles.btnPrimary}>{editingStudentId ? 'Save Student' : 'Create Student'}</button>
-                {editingStudentId && <button type="button" style={styles.btnGhost} onClick={cancelEditStudent}>Cancel</button>}
-                <div style={{ marginLeft: 'auto', ...styles.smallMuted }}>Tip: Student username is generated by the server.</div>
-              </div>
-            </form>
-          </div>
+          <ul style={{ listStyle: 'none', padding: 0 }}>
+            {filteredTeachers.map(t => (
+              <li key={t.id || t.username} style={{ padding: 8, borderBottom: '1px solid #eee' }}>
+                <div><strong>{t.username}</strong></div>
+                <div style={{ color: '#666' }}>{t.course_name ?? t.course_code}</div>
+              </li>
+            ))}
+            {filteredTeachers.length === 0 && <li style={{ color: '#666' }}>No teachers found</li>}
+          </ul>
         </div>
 
-        <div>
-          <div style={{ ...styles.card }}>
-            <h3 style={{ marginTop: 0, color: '#16325c' }}>Teachers (All)</h3>
-
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <input style={styles.input} placeholder="Search teachers..." value={teacherQuery} onChange={e => setTeacherQuery(e.target.value)} />
-              <button style={styles.btnGhost} onClick={() => { setTeacherQuery(''); }}>Clear</button>
-            </div>
-
-            <div style={{ maxHeight: 300, overflow: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead style={styles.tableHeader}>
-                  <tr>
-                    <th style={{ textAlign: 'left', padding: 8 }}>Username</th>
-                    <th style={{ textAlign: 'left', padding: 8 }}>Courses</th>
-                    <th style={{ padding: 8 }}>Last Login</th>
-                    <th style={{ padding: 8 }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {teachers.filter(t => (t.username || '').toLowerCase().includes(teacherQuery.toLowerCase())).map(t => (
-                    <tr key={t.id} style={{ borderTop: '1px solid #f1f5fa' }}>
-                      <td style={{ padding: 8, fontWeight: 700, color: '#0b5ed7' }}>{t.username}</td>
-                      <td style={{ padding: 8 }}>{t.course_codes && t.course_codes.length ? t.course_codes.join(', ') : (t.course_code || '-')}</td>
-                      <td style={{ padding: 8 }}>{t.last_login_at ? new Date(t.last_login_at).toLocaleString() : '-'}</td>
-                      <td style={{ padding: 8, textAlign: 'right' }}>
-                        <button className="btn" style={styles.btnGhost} onClick={() => startEditTeacher(t)}>Edit</button>
-                        <button className="btn" style={{ ...styles.btnGhost, marginLeft: 8 }} onClick={() => deleteTeacher(t.id)}>Delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <h3 style={{ marginTop: 14, color: '#16325c' }}>Students (All)</h3>
-
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <input style={styles.input} placeholder="Search students (roll, name, username)..." value={studentQuery} onChange={e => setStudentQuery(e.target.value)} />
-              <button style={styles.btnGhost} onClick={() => { setStudentQuery(''); }}>Clear</button>
-            </div>
-
-            <div style={{ maxHeight: 300, overflow: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead style={styles.tableHeader}>
-                  <tr>
-                    <th style={{ textAlign: 'left', padding: 8 }}>Roll</th>
-                    <th style={{ textAlign: 'left', padding: 8 }}>Name</th>
-                    <th style={{ textAlign: 'left', padding: 8 }}>Courses</th>
-                    <th style={{ padding: 8 }}>Username</th>
-                    <th style={{ padding: 8 }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {students.filter(s => {
-                    const q = studentQuery.toLowerCase();
-                    return !q || (s.roll_number || '').toLowerCase().includes(q) || (s.name || '').toLowerCase().includes(q) || (s.username || '').toLowerCase().includes(q);
-                  }).map(s => (
-                    <tr key={s.id} style={{ borderTop: '1px solid #f1f5fa' }}>
-                      <td style={{ padding: 8, fontWeight: 700, color: '#0b5ed7' }}>{s.roll_number}</td>
-                      <td style={{ padding: 8 }}>{s.name}</td>
-                      <td style={{ padding: 8 }}>{(s.course_codes && s.course_codes.length) ? s.course_codes.join(', ') : (s.course_code || '-')}</td>
-                      <td style={{ padding: 8 }}>{s.username || '-'}</td>
-                      <td style={{ padding: 8, textAlign: 'right' }}>
-                        {s.username && <button className="btn" style={styles.btnGhost} onClick={() => copyToClipboard(s.username)}>Copy</button>}
-                        <button className="btn" style={{ ...styles.btnGhost, marginLeft: 8 }} onClick={() => startEditStudent(s)}>Edit</button>
-                        <button className="btn" style={{ ...styles.btnGhost, marginLeft: 8 }} onClick={() => normalizeStudent(s.id)} disabled={normalizingIds.includes(s.id)}>{normalizingIds.includes(s.id) ? 'Normalizing...' : 'Normalize'}</button>
-                        <button className="btn" style={{ ...styles.btnGhost, marginLeft: 8, background: '#fff4f4' }} onClick={() => deleteStudent(s.id)}>Delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
+        <div style={{ flex: 1 }}>
+          <h3>Students</h3>
+          <div style={{ marginBottom: 8 }}>
+            <label htmlFor="student-search" style={srOnly}>Search students</label>
+            <input
+              id="student-search"
+              name="studentSearch"
+              placeholder="Search students..."
+              value={studentSearch}
+              onChange={e => setStudentSearch(e.target.value)}
+              style={{ width: '100%', padding: 8 }}
+            />
           </div>
+
+          <ul style={{ listStyle: 'none', padding: 0 }}>
+            {filteredStudents.map(s => (
+              <li key={s.id || s.roll_number} style={{ padding: 8, borderBottom: '1px solid #eee' }}>
+                <div><strong>{s.name}</strong></div>
+                <div style={{ color: '#666' }}>{s.roll_number} • {s.course_code}</div>
+              </li>
+            ))}
+            {filteredStudents.length === 0 && <li style={{ color: '#666' }}>No students found</li>}
+          </ul>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
-
-
