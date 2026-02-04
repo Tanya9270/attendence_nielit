@@ -7,16 +7,16 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Handle CORS
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    // 1. Validate the custom API Key
+    // 1. Security Check
     const markFnKey = Deno.env.get("MARK_FN_API_KEY");
     if (markFnKey && req.headers.get("x-mark-fn-api-key") !== markFnKey) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
-    // 2. Initialize Supabase Admin Client (using Service Role Key)
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -24,58 +24,67 @@ serve(async (req) => {
 
     const { type, username, password, name, course_code, course_name } = await req.json();
     
-    // Auto-generate email based on username (e.g., student001 -> student001@nielit.com)
-    const email = username.includes('@') ? username : `${username.replace(/\//g, '_')}@nielit.com`;
+    // Normalize email to lowercase
+    const email = username.includes('@') ? username.toLowerCase() : `${username.replace(/\//g, '_').toLowerCase()}@nielit.com`;
 
-    console.log(`Creating ${type} user: ${email}`);
+    let userId;
 
-    // 3. Create the Auth User (This creates the actual login)
-    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true
-    });
+    // 2. SMART AUTH: Check if user exists before creating
+    const { data: userList } = await supabase.auth.admin.listUsers();
+    const existingUser = userList.users.find(u => u.email === email);
 
-    if (authError) throw authError;
-    const userId = authUser.user.id;
-
-    // 4. Set the Role in public.profiles table
-    const role = type === 'teacher' ? 'teacher' : 'student';
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .upsert({ id: userId, role });
-    
-    if (profileError) throw profileError;
-
-    // 5. Create Business Data (Student record or Course record)
-    if (type === 'teacher') {
-      const { error: courseError } = await supabase
-        .from('courses')
-        .upsert({ 
-          course_code: course_code, 
-          course_name: course_name, 
-          teacher_name: name || username 
-        });
-      if (courseError) throw courseError;
+    if (existingUser) {
+      userId = existingUser.id;
+      console.log(`User ${email} exists. Using ID: ${userId}`);
     } else {
-      const { error: studentError } = await supabase
-        .from('students')
-        .upsert({ 
-          user_id: userId, 
-          roll_number: username, 
-          name: name, 
-          course_code: course_code 
-        });
-      if (studentError) throw studentError;
+      const { data: newUser, error: authError } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true
+      });
+      if (authError) throw authError;
+      userId = newUser.user.id;
+      console.log(`Created new user: ${email}`);
     }
 
-    return new Response(JSON.stringify({ success: true, userId, email }), { 
+    // 3. SET ROLE IN PROFILES
+    const role = type === 'teacher' ? 'teacher' : 'student';
+    await supabase.from('profiles').upsert({ id: userId, role });
+
+    // 4. SMART DATABASE INSERT (Using Upsert to avoid "Duplicate Key" errors)
+    if (type === 'teacher') {
+      // If JAI-001 exists, update the teacher name and course name
+      const { error: courseErr } = await supabase.from('courses').upsert({ 
+        course_code: course_code, 
+        course_name: course_name, 
+        teacher_name: name || username 
+      }, { onConflict: 'course_code' });
+      
+      if (courseErr) throw courseErr;
+    } else {
+      // If roll number exists, update the name and linked course
+      const { error: studentErr } = await supabase.from('students').upsert({ 
+        user_id: userId, 
+        roll_number: username, 
+        name: name, 
+        course_code: course_code 
+      }, { onConflict: 'roll_number' });
+      
+      if (studentErr) throw studentErr;
+    }
+
+    return new Response(JSON.stringify({ 
+      ok: true, 
+      success: true, 
+      message: "User synchronized successfully",
+      userId 
+    }), { 
       headers: { ...corsHeaders, "Content-Type": "application/json" } 
     });
 
   } catch (err: any) {
     console.error("Management Error:", err.message);
-    return new Response(JSON.stringify({ error: err.message }), { 
+    return new Response(JSON.stringify({ ok: false, error: err.message }), { 
         status: 400, 
         headers: { ...corsHeaders, "Content-Type": "application/json" } 
     });

@@ -1,32 +1,18 @@
-﻿// client/src/components/AdminPanel.jsx
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 
-const srOnly = {
-  position: 'absolute',
-  width: '1px',
-  height: '1px',
-  padding: 0,
-  margin: '-1px',
-  overflow: 'hidden',
-  clip: 'rect(0,0,0,0)',
-  whiteSpace: 'nowrap',
-  border: 0,
-};
-
 export default function AdminPanel() {
-  const [token, setToken] = useState(null);
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
   const [courses, setCourses] = useState([]);
+  const [message, setMessage] = useState({ type: '', text: '' });
 
-  // Teacher form
+  // Form states
   const [teacherUsername, setTeacherUsername] = useState('');
   const [teacherPassword, setTeacherPassword] = useState('');
   const [teacherCourseCode, setTeacherCourseCode] = useState('');
   const [teacherCourseName, setTeacherCourseName] = useState('');
 
-  // Student form
   const [studentRoll, setStudentRoll] = useState('');
   const [studentName, setStudentName] = useState('');
   const [studentCourseCode, setStudentCourseCode] = useState('');
@@ -35,11 +21,15 @@ export default function AdminPanel() {
   const [teacherSearch, setTeacherSearch] = useState('');
   const [studentSearch, setStudentSearch] = useState('');
 
+  // Get token from localStorage
+  const token = localStorage.getItem('token');
+
   useEffect(() => {
     loadAll();
   }, []);
 
   async function loadAll() {
+    if (!token) return;
     try {
       const t = await api.getTeachers(token);
       const s = await api.getStudents(token);
@@ -52,23 +42,24 @@ export default function AdminPanel() {
     }
   }
 
+  const showStatus = (type, text) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+  };
+
   async function handleCreateTeacher(e) {
     e.preventDefault();
     try {
-      const res = await api.createTeacher(token, teacherUsername, teacherPassword, teacherCourseCode, teacherCourseName);
+      const res = await api.createTeacher(token, teacherUsername, teacherPassword, [teacherCourseCode], teacherCourseName);
       if (res.ok) {
-        setTeacherUsername('');
-        setTeacherPassword('');
-        setTeacherCourseCode('');
-        setTeacherCourseName('');
+        showStatus('success', '✅ Teacher & Course synchronized successfully!');
+        setTeacherUsername(''); setTeacherPassword(''); setTeacherCourseCode(''); setTeacherCourseName('');
         await loadAll();
       } else {
-        console.error('createTeacher failed', res);
-        alert(`Create teacher failed: ${res.status || 'error'}`);
+        showStatus('error', '❌ Error: ' + (res.error || 'Failed to create'));
       }
     } catch (err) {
-      console.error(err);
-      alert('Network error while creating teacher');
+      showStatus('error', '❌ Network error');
     }
   }
 
@@ -77,199 +68,112 @@ export default function AdminPanel() {
     try {
       const res = await api.createStudent(token, studentRoll, studentName, [studentCourseCode]);
       if (res.ok) {
-        setStudentRoll('');
-        setStudentName('');
-        setStudentCourseCode('');
+        showStatus('success', '✅ Student account created successfully!');
+        setStudentRoll(''); setStudentName(''); setStudentCourseCode('');
         await loadAll();
       } else {
-        console.error('createStudent failed', res);
-        alert(`Create student failed: ${res.status || 'error'}`);
+        showStatus('error', '❌ Error: ' + (res.error || 'Failed to create'));
       }
     } catch (err) {
-      console.error(err);
-      alert('Network error while creating student');
+      showStatus('error', '❌ Network error');
     }
   }
 
+  // Filter logic updated to match Supabase column names
   const filteredTeachers = teachers.filter(t =>
-    (t.username || '').toLowerCase().includes(teacherSearch.toLowerCase())
+    (t.teacher_name || '').toLowerCase().includes(teacherSearch.toLowerCase()) ||
+    (t.course_code || '').toLowerCase().includes(teacherSearch.toLowerCase())
   );
 
   const filteredStudents = students.filter(s =>
-    (s.name || '').toLowerCase().includes(studentSearch.toLowerCase())
+    (s.name || '').toLowerCase().includes(studentSearch.toLowerCase()) ||
+    (s.roll_number || '').toLowerCase().includes(studentSearch.toLowerCase())
   );
 
   return (
-    <div style={{ padding: 20, fontFamily: 'system-ui, Arial' }}>
-      <h1>Admin Panel</h1>
+    <div className="container">
+      <h1 style={{ color: 'var(--nielit-blue)', marginBottom: '20px' }}>Admin Dashboard</h1>
 
-      <section style={{ display: 'flex', gap: 24, marginBottom: 24 }}>
-        <div style={{ flex: 1, padding: 12, border: '1px solid #e2e2e2', borderRadius: 8 }}>
-          <h2 style={{ marginTop: 0 }}>Create Teacher</h2>
+      {message.text && (
+        <div className={`alert alert-${message.type}`}>{message.text}</div>
+      )}
+
+      {/* CREATE FORMS SECTION */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+        
+        {/* Create Teacher Form */}
+        <div className="card">
+          <h2 style={{ fontSize: '18px', marginBottom: '20px', color: 'var(--nielit-blue)' }}>👨‍🏫 Create Teacher</h2>
           <form onSubmit={handleCreateTeacher}>
-            <div style={{ marginBottom: 8 }}>
-              <label htmlFor="teacher-username">Username</label>
-              <input
-                id="teacher-username"
-                name="teacherUsername"
-                type="text"
-                placeholder="e.g. john.doe"
-                value={teacherUsername}
-                onChange={e => setTeacherUsername(e.target.value)}
-                required
-                style={{ width: '100%', padding: 8, marginTop: 4 }}
-              />
+            <div className="form-group">
+              <label>Username / Email Prefix</label>
+              <input type="text" placeholder="e.g. cheshta" value={teacherUsername} onChange={e => setTeacherUsername(e.target.value)} required />
             </div>
-
-            <div style={{ marginBottom: 8 }}>
-              <label htmlFor="teacher-password">Password</label>
-              <input
-                id="teacher-password"
-                name="teacherPassword"
-                type="password"
-                placeholder="password"
-                value={teacherPassword}
-                onChange={e => setTeacherPassword(e.target.value)}
-                required
-                style={{ width: '100%', padding: 8, marginTop: 4 }}
-              />
+            <div className="form-group">
+              <label>Set Password</label>
+              <input type="password" placeholder="password" value={teacherPassword} onChange={e => setTeacherPassword(e.target.value)} required />
             </div>
-
-            <div style={{ marginBottom: 8 }}>
-              <label htmlFor="teacher-course-code">Course Code</label>
-              <input
-                id="teacher-course-code"
-                name="teacherCourseCode"
-                type="text"
-                placeholder="COURSE101"
-                value={teacherCourseCode}
-                onChange={e => setTeacherCourseCode(e.target.value)}
-                style={{ width: '100%', padding: 8, marginTop: 4 }}
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div className="form-group">
+                <label>Course Code</label>
+                <input type="text" placeholder="JAI-001" value={teacherCourseCode} onChange={e => setTeacherCourseCode(e.target.value)} required />
+              </div>
+              <div className="form-group">
+                <label>Course Name</label>
+                <input type="text" placeholder="AI Tech" value={teacherCourseName} onChange={e => setTeacherCourseName(e.target.value)} required />
+              </div>
             </div>
-
-            <div style={{ marginBottom: 8 }}>
-              <label htmlFor="teacher-course-name">Course Name</label>
-              <input
-                id="teacher-course-name"
-                name="teacherCourseName"
-                type="text"
-                placeholder="Course name"
-                value={teacherCourseName}
-                onChange={e => setTeacherCourseName(e.target.value)}
-                style={{ width: '100%', padding: 8, marginTop: 4 }}
-              />
-            </div>
-
-            <button type="submit" style={{ padding: '8px 12px' }}>Create Teacher</button>
+            <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Create Teacher Account</button>
           </form>
         </div>
 
-        <div style={{ flex: 1, padding: 12, border: '1px solid #e2e2e2', borderRadius: 8 }}>
-          <h2 style={{ marginTop: 0 }}>Create Student</h2>
+        {/* Create Student Form */}
+        <div className="card">
+          <h2 style={{ fontSize: '18px', marginBottom: '20px', color: 'var(--nielit-green)' }}>👨‍🎓 Create Student</h2>
           <form onSubmit={handleCreateStudent}>
-            <div style={{ marginBottom: 8 }}>
-              <label htmlFor="student-roll">Roll Number</label>
-              <input
-                id="student-roll"
-                name="studentRoll"
-                type="text"
-                placeholder="Roll number"
-                value={studentRoll}
-                onChange={e => setStudentRoll(e.target.value)}
-                required
-                style={{ width: '100%', padding: 8, marginTop: 4 }}
-              />
+            <div className="form-group">
+              <label>Roll Number</label>
+              <input type="text" placeholder="001/JAI/1" value={studentRoll} onChange={e => setStudentRoll(e.target.value)} required />
             </div>
-
-            <div style={{ marginBottom: 8 }}>
-              <label htmlFor="student-name">Name</label>
-              <input
-                id="student-name"
-                name="studentName"
-                type="text"
-                placeholder="Full name"
-                value={studentName}
-                onChange={e => setStudentName(e.target.value)}
-                required
-                style={{ width: '100%', padding: 8, marginTop: 4 }}
-              />
+            <div className="form-group">
+              <label>Full Name</label>
+              <input type="text" placeholder="Student Name" value={studentName} onChange={e => setStudentName(e.target.value)} required />
             </div>
-
-            <div style={{ marginBottom: 8 }}>
-              <label htmlFor="student-course">Course</label>
-              <select
-                id="student-course"
-                name="studentCourseCode"
-                value={studentCourseCode}
-                onChange={e => setStudentCourseCode(e.target.value)}
-                style={{ width: '100%', padding: 8, marginTop: 4 }}
-              >
-                <option value="">Select course (optional)</option>
+            <div className="form-group">
+              <label>Assign Course</label>
+              <select value={studentCourseCode} onChange={e => setStudentCourseCode(e.target.value)} required>
+                <option value="">Select a course</option>
                 {courses.map(c => (
-                  <option key={c.code ?? c.id} value={c.code ?? c.id}>
-                    {c.name ?? c.course_name ?? c.code}
-                  </option>
+                  <option key={c.course_code} value={c.course_code}>{c.course_name} ({c.course_code})</option>
                 ))}
               </select>
             </div>
-
-            <button type="submit" style={{ padding: '8px 12px' }}>Create Student</button>
+            <button type="submit" className="btn btn-success" style={{ width: '100%', background: 'var(--nielit-green)' }}>Create Student Account</button>
           </form>
         </div>
-      </section>
+      </div>
 
-      <section style={{ display: 'flex', gap: 24 }}>
-        <div style={{ flex: 1 }}>
-          <h3>Teachers</h3>
-          <div style={{ marginBottom: 8 }}>
-            <label htmlFor="teacher-search" style={srOnly}>Search teachers</label>
-            <input
-              id="teacher-search"
-              name="teacherSearch"
-              placeholder="Search teachers..."
-              value={teacherSearch}
-              onChange={e => setTeacherSearch(e.target.value)}
-              style={{ width: '100%', padding: 8 }}
-            />
+      {/* DATA LISTS SECTION */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+        
+        {/* Teachers List */}
+        <div>
+          <h3 style={{ marginBottom: '15px' }}>Current Faculty</h3>
+          <div className="form-group">
+            <input type="text" placeholder="Search teachers or courses..." value={teacherSearch} onChange={e => setTeacherSearch(e.target.value)} />
           </div>
-
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {filteredTeachers.map(t => (
-              <li key={t.id || t.username} style={{ padding: 8, borderBottom: '1px solid #eee' }}>
-                <div><strong>{t.username}</strong></div>
-                <div style={{ color: '#666' }}>{t.course_name ?? t.course_code}</div>
-              </li>
+          <div className="admin-data-list">
+            {filteredTeachers.map((t) => (
+              <div key={t.course_code} className="data-card">
+                <div>
+                  <div className="card-title">👨‍🏫 {t.teacher_name}</div>
+                  <div className="card-subtitle">{t.course_name}</div>
+                </div>
+                <span className="course-badge">{t.course_code}</span>
+              </div>
             ))}
-            {filteredTeachers.length === 0 && <li style={{ color: '#666' }}>No teachers found</li>}
-          </ul>
+            {filteredTeachers.length === 0 && <p className="text-center">No teachers found</p>}
+          </div>
         </div>
 
-        <div style={{ flex: 1 }}>
-          <h3>Students</h3>
-          <div style={{ marginBottom: 8 }}>
-            <label htmlFor="student-search" style={srOnly}>Search students</label>
-            <input
-              id="student-search"
-              name="studentSearch"
-              placeholder="Search students..."
-              value={studentSearch}
-              onChange={e => setStudentSearch(e.target.value)}
-              style={{ width: '100%', padding: 8 }}
-            />
-          </div>
-
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {filteredStudents.map(s => (
-              <li key={s.id || s.roll_number} style={{ padding: 8, borderBottom: '1px solid #eee' }}>
-                <div><strong>{s.name}</strong></div>
-                <div style={{ color: '#666' }}>{s.roll_number} • {s.course_code}</div>
-              </li>
-            ))}
-            {filteredStudents.length === 0 && <li style={{ color: '#666' }}>No students found</li>}
-          </ul>
-        </div>
-      </section>
-    </div>
-  );
-}
+        {/* Students Lis
