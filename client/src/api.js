@@ -13,7 +13,7 @@ const getHeaders = (token = null) => {
 };
 
 export const api = {
-  // 1. AUTHENTICATION (Database-backed Roles)
+  // 1. AUTHENTICATION (Fixed for Admin Portal)
   async login(username, password) {
     try {
       const email = username.includes('@') ? username : `${username}@nielit.com`;
@@ -28,12 +28,18 @@ export const api = {
       if (!res.ok) return { ok: false, error: authData.error_description || 'invalid_credentials' };
 
       // FETCH THE REAL ROLE FROM THE PROFILES TABLE
-      // This stops the "Swati" login issue by checking the actual database role
       const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${authData.user.id}&select=role`, {
         headers: getHeaders(authData.access_token)
       });
       const profileData = await profileRes.json();
-      const userRole = profileData[0]?.role || 'student';
+      
+      // Fallback: If no DB profile exists, but username is "admin", treat as admin
+      let userRole = profileData[0]?.role;
+      if (!userRole && username.toLowerCase() === 'admin') {
+          userRole = 'admin';
+      } else if (!userRole) {
+          userRole = 'student';
+      }
 
       return {
         ok: true,
@@ -50,20 +56,46 @@ export const api = {
     }
   },
 
-  // 2. PROFILE DATA (Filtered by Logged-in User ID)
+  // 2. PROFILE DATA (Added Safety Check for Admin)
   async getStudentMe(token) {
-    // We must filter by the user's ID so you don't see "Swati" if you aren't Swati
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const userString = localStorage.getItem('user');
+    if (!userString) return null;
+    
+    const user = JSON.parse(userString);
+
+    // FIX: If user is admin, do NOT call the student database
+    if (user.role === 'admin' || !user.id) {
+        console.log("Skipping student profile fetch for admin user.");
+        return null;
+    }
+
     const res = await fetch(`${SUPABASE_URL}/rest/v1/students?user_id=eq.${user.id}&select=*`, {
       headers: getHeaders(token)
     });
+    
+    if (!res.ok) return null;
     const data = await res.json();
-    return data[0];
+    return data[0] || null;
   },
 
-  // 3. ADMIN ACTIONS (Restricted to Admin Role)
+  // 3. DATA FETCHING FOR PORTALS
+  async getCourses(token) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/courses?select=*`, {
+      headers: getHeaders(token)
+    });
+    return res.json();
+  },
+
+  async getDailyAttendance(token, date, courseCode) {
+    let url = `${SUPABASE_URL}/rest/v1/attendance?date=eq.${date}`;
+    if (courseCode) url += `&course_code=eq.${courseCode}`;
+    const res = await fetch(url, { headers: getHeaders(token) });
+    const data = await res.json();
+    return { ok: true, data: data };
+  },
+
+  // 4. ADMIN ACTIONS
   async createTeacher(token, username, password, courseCodes, courseName) {
-    // This adds the course and assigns the teacher name
     const res = await fetch(`${SUPABASE_URL}/rest/v1/courses`, {
       method: 'POST',
       headers: getHeaders(token),
@@ -89,14 +121,7 @@ export const api = {
     return { ok: res.ok };
   },
 
-  // 4. ATTENDANCE & COURSES
-  async getCourses(token) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/courses?select=*`, {
-      headers: getHeaders(token)
-    });
-    return res.json();
-  },
-
+  // 5. ATTENDANCE SCANNING
   async markMyAttendance(token, qrPayload) {
     const response = await fetch(FUNCTION_URL, {
       method: 'POST',
