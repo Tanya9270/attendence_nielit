@@ -1,4 +1,4 @@
-name: Deploy Backend and Database
+name: Deploy Full Backend
 
 on:
   push:
@@ -18,15 +18,15 @@ jobs:
         with:
           version: latest
 
-      - name: Link and Push Database Migrations
-        # Fix: We link first, then push. This creates your profiles table.
+      - name: Link and Push Database
         run: |
           supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} --password ${{ secrets.DB_PASSWORD }}
           supabase db push --password ${{ secrets.DB_PASSWORD }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - name: Deploy mark-attendance function
-        run: supabase functions deploy mark-attendance --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} --no-verify-jwt
+      - name: Deploy All Edge Functions
+        # This deploys both mark-attendance and manage-users
+        run: supabase functions deploy --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} --no-verify-jwt
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
