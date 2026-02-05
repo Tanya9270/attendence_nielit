@@ -9,19 +9,7 @@ const getHeaders = (token) => ({
 });
 
 export const api = {
-  // NEW: Forgot Password functionality
-  async forgotPassword(email) {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
-    });
-    return { ok: res.ok };
-  },
-
-  async login(username, password) {
-    // If username is not email, we append the domain
-    const email = username.includes('@') ? username : `${username.replace(/\//g, '_')}@nielit.com`;
+  async login(email, password) {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
       body: JSON.stringify({ email, password })
@@ -33,42 +21,34 @@ export const api = {
       headers: getHeaders(data.access_token)
     });
     const profileData = await profileRes.json();
-    return { ok: true, token: data.access_token, user: { id: data.user.id, username, role: profileData[0]?.role || 'student' } };
+    return { ok: true, token: data.access_token, user: { id: data.user.id, email, role: profileData[0]?.role || 'student' } };
   },
 
-  // UPDATED: Now requires real email
-  async createTeacher(token, name, email, password, code, courseName) {
+  async forgotPassword(email) {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    return { ok: res.ok };
+  },
+
+  async createTeacher(token, name, email, password, code) {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
       method: 'POST',
       headers: { ...getHeaders(token), 'x-mark-fn-api-key': MARK_FN_KEY },
-      body: JSON.stringify({ type: 'teacher', username: email, password, name, course_code: code, course_name: courseName })
+      body: JSON.stringify({ type: 'teacher', email, password, name, course_code: code })
     });
     return { ...await res.json(), ok: res.ok };
   },
 
-  async createStudent(token, name, email, roll, code) {
+  async createStudent(token, name, email, roll, password, code) {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
       method: 'POST',
       headers: { ...getHeaders(token), 'x-mark-fn-api-key': MARK_FN_KEY },
-      body: JSON.stringify({ type: 'student', username: email, name, roll_number: roll, course_code: code, password: 'password123' })
+      body: JSON.stringify({ type: 'student', email, roll_number: roll, name, password, course_code: code })
     });
     return { ...await res.json(), ok: res.ok };
-  },
-
-  async getTeachers(token) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/courses?select=*,profiles!inner(id)`, { headers: getHeaders(token) });
-    const data = await res.json();
-    return data.map(t => ({ ...t, id: t.profiles?.id }));
-  },
-
-  async getStudents(token) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/students?select=*`, { headers: getHeaders(token) });
-    return await res.json();
-  },
-
-  async getCourses(token) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/courses?select=*`, { headers: getHeaders(token) });
-    return await res.json();
   },
 
   async deleteUser(token, userId) {
@@ -78,5 +58,23 @@ export const api = {
       body: JSON.stringify({ action: 'delete', userId })
     });
     return { ...await res.json(), ok: res.ok };
+  },
+
+  async getTeachers(token) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/courses?select=*,profiles:profiles!inner(id)`, { headers: getHeaders(token) });
+    const data = await res.json();
+    return Array.isArray(data) ? data.map(t => ({ ...t, id: t.profiles?.id })) : [];
+  },
+
+  async getStudents(token) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/students?select=*`, { headers: getHeaders(token) });
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  },
+
+  async getCourses(token) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/courses?select=*`, { headers: getHeaders(token) });
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
   }
 };

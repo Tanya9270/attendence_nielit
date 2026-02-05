@@ -8,44 +8,49 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // CRITICAL: Handle preflight immediately
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    
-    // Security check
-    const markFnKey = Deno.env.get("MARK_FN_API_KEY");
-    if (markFnKey && req.headers.get("x-mark-fn-api-key") !== markFnKey) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
-    }
+    const { action, type, userId, email, password, name, roll_number, course_code } = await req.json();
 
-    const { action, type, userId, username, password, name, course_code, course_name } = await req.json();
-
+    // 1. DELETE ACTION
     if (action === 'delete') {
       const { error } = await supabase.auth.admin.deleteUser(userId);
       if (error) throw error;
       return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const email = username.includes('@') ? username.toLowerCase() : `${username.replace(/\//g, '_').toLowerCase()}@nielit.com`;
+    // 2. CREATE/UPDATE ACTION
     const { data: userList } = await supabase.auth.admin.listUsers();
-    let targetId = userList.users.find(u => u.email === email)?.id;
+    let targetId = userList.users.find(u => u.email?.toLowerCase() === email.toLowerCase())?.id;
 
     if (!targetId) {
-      const { data: newUser, error: authErr } = await supabase.auth.admin.createUser({ email, password, email_confirm: true });
+      const { data: newUser, error: authErr } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true
+      });
       if (authErr) throw authErr;
       targetId = newUser.user.id;
     }
 
-    await supabase.from('profiles').upsert({ id: targetId, role: type === 'teacher' ? 'teacher' : 'student' });
+    const role = type === 'teacher' ? 'teacher' : 'student';
+    await supabase.from('profiles').upsert({ id: targetId, role });
 
     if (type === 'teacher') {
-      await supabase.from('courses').upsert({ course_code, course_name, teacher_name: name || username }, { onConflict: 'course_code' });
+      await supabase.from('courses').upsert({ 
+        course_code, 
+        course_name: "General Course", 
+        teacher_name: name 
+      }, { onConflict: 'course_code' });
     } else {
-      await supabase.from('students').upsert({ user_id: targetId, roll_number: username, name, course_code }, { onConflict: 'roll_number' });
+      await supabase.from('students').upsert({ 
+        user_id: targetId, 
+        roll_number, 
+        name, 
+        course_code 
+      }, { onConflict: 'roll_number' });
     }
 
     return new Response(JSON.stringify({ ok: true, userId: targetId }), { 
@@ -54,7 +59,7 @@ serve(async (req) => {
 
   } catch (err: any) {
     return new Response(JSON.stringify({ ok: false, error: err.message }), { 
-      status: 200, // Return 200 so the frontend can read the error JSON
+      status: 200, 
       headers: { ...corsHeaders, "Content-Type": "application/json" } 
     });
   }

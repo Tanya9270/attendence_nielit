@@ -1,142 +1,21 @@
-/* client/src/index.css - Premium NIELIT UI */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
-
-* {
-  margin: 0; padding: 0; box-sizing: border-box;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-}
-
-:root {
-  --nielit-blue: #0066B3;
-  --nielit-light: #00A0E3;
-  --success-green: #10b981;
-  --danger-red: #ef4444;
-  --card-bg: rgba(255, 255, 255, 0.9);
-  --glass-border: rgba(255, 255, 255, 0.5);
-}
-
-body {
-  background: #f0f7ff; /* Soft sky blue background */
-  background-image: 
-    radial-gradient(at 0% 0%, hsla(203,100%,94%,1) 0, transparent 50%), 
-    radial-gradient(at 50% 0%, hsla(197,100%,92%,1) 0, transparent 50%);
-  color: #1e293b;
-  min-height: 100vh;
-}
-
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+:root { --nielit-blue: #0066B3; --nielit-light: #00A0E3; --success-green: #10b981; }
+body { background: #f0f7ff; color: #1e293b; min-height: 100vh; }
 .container { max-width: 1300px; margin: 0 auto; padding: 40px 20px; }
-
-/* Dashboard Header */
-.admin-header {
-  background: var(--card-bg);
-  backdrop-filter: blur(10px);
-  padding: 25px 35px;
-  border-radius: 24px;
-  box-shadow: 0 10px 30px -5px rgba(0, 102, 179, 0.1);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 35px;
-  border: 1px solid var(--glass-border);
-  border-left: 10px solid var(--nielit-blue);
-}
-
-/* Vibrant Cards */
-.dashboard-card {
-  background: var(--card-bg);
-  backdrop-filter: blur(12px);
-  border-radius: 28px;
-  padding: 35px;
-  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.05);
-  border: 1px solid var(--glass-border);
-  transition: transform 0.3s ease;
-}
-
-.dashboard-card h2 {
-  color: var(--nielit-blue);
-  font-weight: 800;
-  font-size: 1.4rem;
-  margin-bottom: 25px;
-}
-
-/* Modern Inputs */
-.modern-input {
-  width: 100%;
-  padding: 14px 20px;
-  border: 2px solid #e2e8f0;
-  border-radius: 14px;
-  margin-bottom: 18px;
-  font-size: 15px;
-  background: #f8fafc;
-  transition: all 0.3s;
-}
-
-.modern-input:focus {
-  outline: none;
-  border-color: var(--nielit-blue);
-  background: white;
-  box-shadow: 0 0 0 4px rgba(0, 102, 179, 0.1);
-}
-
-/* Vibrant Buttons */
-.btn-premium {
-  padding: 14px 28px;
-  border-radius: 14px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  border: none;
-  cursor: pointer;
-  color: white;
-  transition: all 0.3s;
-}
-
-.btn-blue { background: linear-gradient(135deg, #00A0E3 0%, #0066B3 100%); }
-.btn-green { background: linear-gradient(135deg, #34d399 0%, #10b981 100%); }
-
-.btn-premium:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 20px -5px rgba(0, 102, 179, 0.4);
-}
-
-/* Filter Bar */
-.filter-bar {
-  background: #e0f2fe;
-  padding: 15px 25px;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  border: 1px solid #bae6fd;
-}
-
-/* Data List Items */
-.data-card {
-  background: white;
-  padding: 20px;
-  border-radius: 18px;
-  margin-bottom: 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border: 1px solid #f1f5f9;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-}
-
+.admin-header { background: white; padding: 25px 35px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; margin-bottom: 35px; border-left: 10px solid var(--nielit-blue); }
+.dashboard-card { background: white; border-radius: 28px; padding: 35px; box-shadow: 0 20px 40px rgba(0,0,0,0.05); }
+.modern-input { width: 100%; padding: 14px 20px; border: 2px solid #e2e8f0; border-radius: 14px; margin-bottom: 18px; background: #f8fafc; }
+.modern-input:focus { outline: none; border-color: var(--nielit-blue); background: white; }
+.btn-premium { padding: 14px; border-radius: 14px; font-weight: 700; text-transform: uppercase; border: none; cursor: pointer; color: white; transition: 0.3s; width: 100%; }
+.btn-blue { background: linear-gradient(135deg, #00A0E3, #0066B3); }
+.btn-green { background: linear-gradient(135deg, #34d399, #10b981); }
+.btn-premium:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0, 102, 179, 0.3); }
+.filter-bar { background: #e0f2fe; padding: 15px 25px; border-radius: 16px; display: flex; align-items: center; gap: 15px; }
+.data-card { background: white; padding: 20px; border-radius: 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #f1f5f9; }
 .teacher-indicator { border-left: 6px solid var(--nielit-blue); }
 .student-indicator { border-left: 6px solid var(--success-green); }
-
-.badge-vibrant {
-  background: #f1f5f9;
-  color: #475569;
-  padding: 6px 12px;
-  border-radius: 10px;
-  font-weight: 800;
-  font-size: 11px;
-}
-
+.delete-icon-btn { background: #fee2e2; color: #ef4444; border: none; padding: 8px; border-radius: 10px; cursor: pointer; }
 .alert { padding: 15px; border-radius: 12px; margin-bottom: 20px; font-weight: 700; text-align: center; }
 .alert-success { background: #dcfce7; color: #166534; }
 .alert-error { background: #fee2e2; color: #991b1b; }
-
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
