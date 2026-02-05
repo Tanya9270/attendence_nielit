@@ -1,10 +1,15 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import db from '../db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { sendPasswordResetEmail } from '../utils/sendEmail.js';
 
 const router = express.Router();
+
+// In-memory storage for password reset tokens (email -> {token, expiresAt})
+const resetTokens = new Map();
 
 // Helper: normalize course codes input to array of trimmed strings
 function normalizeCourseCodes(input) {
@@ -307,6 +312,83 @@ router.put('/admin/users/:id/normalize-username', authenticateToken, requireRole
         res.json({ ok: true, username: newUsername });
     } catch (err) {
         console.error('Normalize username error:', err);
+        res.status(500).json({ ok: false, error: 'internal_error' });
+    }
+});
+
+// Forgot Password endpoint
+// POST /forgot-password
+router.post('/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ ok: false, error: 'email_required' });
+        }
+
+        // Generate reset token
+        const token = crypto.randomBytes(32).toString('hex');
+        const expiresAt = Date.now() + (parseInt(process.env.RESET_TOKEN_EXPIRY || '3600') * 1000);
+
+        resetTokens.set(email, { token, expiresAt });
+
+        // Generate reset link
+        const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+
+        // Send email
+        const emailResult = await sendPasswordResetEmail(email, resetLink);
+
+        if (emailResult.ok) {
+            res.json({ ok: true, message: 'Password reset email sent' });
+        } else {
+            res.status(500).json({ ok: false, error: emailResult.error });
+        }
+    } catch (err) {
+        console.error('Forgot password error:', err);
+        res.status(500).json({ ok: false, error: 'internal_error' });
+    }
+});
+
+// Reset Password endpoint
+// POST /reset-password
+router.post('/reset-password', async (req, res) => {
+    try {
+        const { email, token, password } = req.body;
+        if (!email || !token || !password) {
+            return res.status(400).json({ ok: false, error: 'missing_fields' });
+        }
+
+        // Verify token
+        const tokenData = resetTokens.get(email);
+        if (!tokenData || tokenData.token !== token) {
+            return res.status(401).json({ ok: false, error: 'invalid_token' });
+        }
+
+        // Check expiry
+        if (tokenData.expiresAt < Date.now()) {
+            resetTokens.delete(email);
+            return res.status(401).json({ ok: false, error: 'token_expired' });
+        }
+
+        // Find user by email
+        const userResult = await db.query('SELECT id FROM users WHERE email = $1', [email]);
+        if (!userResult || userResult.rows.length === 0) {
+            // If email column doesn't exist or is empty, try to find by admin/teacher inference
+            // For now, we require the email to be in the users table
+            return res.status(404).json({ ok: false, error: 'user_not_found' });
+        }
+
+        const userId = userResult.rows[0].id;
+
+        // Update password
+        const hash = await bcrypt.hash(password, 10);
+        await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, userId]);
+
+        // Delete token after use
+        resetTokens.delete(email);
+
+        res.json({ ok: true, message: 'Password reset successfully' });
+    } catch (err) {
+        console.error('Reset password error:', err);
         res.status(500).json({ ok: false, error: 'internal_error' });
     }
 });

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { api } from '../api';
+import Navigation from './Navigation';
 
 export default function StudentPortal() {
   const [student, setStudent] = useState(null);
@@ -221,8 +222,10 @@ export default function StudentPortal() {
 
   return (
     <>
-      <div className="header">
-        <div className="header-content">
+      <Navigation />
+      <div className="container" style={{ paddingTop: '20px' }}>
+        <div className="header">
+          <div className="header-content">
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
             <img src="/nielit-logo.svg" alt="NIELIT" style={{ height: '45px', background: 'white', padding: '5px', borderRadius: '6px' }} />
             <div>

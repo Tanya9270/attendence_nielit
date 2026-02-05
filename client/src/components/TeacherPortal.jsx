@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import QRCode from 'qrcode';
+import Navigation from './Navigation';
 import AdminPanel from './AdminPanel';
 
 export default function TeacherPortal() {
@@ -396,8 +397,10 @@ export default function TeacherPortal() {
 
   return (
     <>
-      <div className="header">
-        <div className="header-content">
+      <Navigation />
+      <div style={{ paddingTop: '20px' }}>
+        <div className="header">
+          <div className="header-content">
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
             <img src="/nielit-logo.svg" alt="NIELIT" style={{ height: '45px', background: 'white', padding: '5px', borderRadius: '6px' }} />
             <div>

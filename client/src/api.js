@@ -1,6 +1,7 @@
 ﻿const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const MARK_FN_KEY = import.meta.env.VITE_MARK_FN_API_KEY;
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 
 const getHeaders = (token) => ({ 
   'Content-Type': 'application/json', 
@@ -60,6 +61,24 @@ export const api = {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
       method: 'POST', headers: { ...getHeaders(token), 'x-mark-fn-api-key': MARK_FN_KEY },
       body: JSON.stringify({ action: 'delete', userId })
+    });
+    return await res.json();
+  },
+
+  async forgotPassword(email) {
+    const res = await fetch(`${SERVER_URL}/api/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    return await res.json();
+  },
+
+  async resetPassword(email, token, password) {
+    const res = await fetch(`${SERVER_URL}/api/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, token, password })
     });
     return await res.json();
   }

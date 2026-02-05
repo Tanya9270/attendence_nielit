@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './index.css';
 import Login from './components/Login';
+import ForgotPassword from './components/ForgotPassword';
+import ResetPassword from './components/ResetPassword';
 import StudentPortal from './components/StudentPortal';
 import TeacherPortal from './components/TeacherPortal';
 // IMPORT the AdminPanel component
@@ -29,7 +31,9 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login />} />
-        
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+
         {/* 1. Dedicated Admin Route */}
         <Route 
           path="/admin" 
