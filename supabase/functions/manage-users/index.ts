@@ -11,28 +11,46 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { action, type, userId, email, password, name, roll_number, course_code } = await req.json();
+    const { action, type, userId, email, password, name, roll_number, course_code, course_name } = await req.json();
 
     if (action === 'delete') {
       await supabase.auth.admin.deleteUser(userId);
       return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { data: list } = await supabase.auth.admin.listUsers();
-    let targetId = list.users.find(u => u.email?.toLowerCase() === email.toLowerCase())?.id;
+    // 1. Create or Get Auth User
+    const { data: userList } = await supabase.auth.admin.listUsers();
+    let targetId = userList.users.find(u => u.email?.toLowerCase() === email.toLowerCase())?.id;
 
     if (!targetId) {
-      const { data: newUser, error: authErr } = await supabase.auth.admin.createUser({ email, password, email_confirm: true });
+      const { data: newUser, error: authErr } = await supabase.auth.admin.createUser({ 
+        email, password, email_confirm: true 
+      });
       if (authErr) throw authErr;
       targetId = newUser.user.id;
     }
 
+    // 2. Set Role in profiles table
     await supabase.from('profiles').upsert({ id: targetId, role: type });
+
+    // 3. Save Teacher/Course or Student Data
     if (type === 'teacher') {
-      await supabase.from('courses').upsert({ course_code, course_name: "General", teacher_name: name }, { onConflict: 'course_code' });
+      const { error: err } = await supabase.from('courses').upsert({ 
+        course_code, 
+        course_name: course_name || "General Course", 
+        teacher_name: name 
+      }, { onConflict: 'course_code' });
+      if (err) throw err;
     } else {
-      await supabase.from('students').upsert({ user_id: targetId, roll_number, name, course_code }, { onConflict: 'roll_number' });
+      const { error: err } = await supabase.from('students').upsert({ 
+        user_id: targetId, 
+        roll_number, 
+        name, 
+        course_code 
+      }, { onConflict: 'roll_number' });
+      if (err) throw err;
     }
+
     return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err: any) {
     return new Response(JSON.stringify({ ok: false, error: err.message }), { status: 200, headers: corsHeaders });
