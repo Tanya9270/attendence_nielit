@@ -20,7 +20,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
     }
 
-    // 1. Find or Create Auth User
     const { data: userList } = await supabase.auth.admin.listUsers();
     let targetId = userList.users.find(u => u.email?.toLowerCase() === email.toLowerCase())?.id;
 
@@ -32,17 +31,16 @@ serve(async (req) => {
       targetId = newUser.user.id;
     }
 
-    // 2. Save Role
     await supabase.from('profiles').upsert({ id: targetId, role: type });
 
-    // 3. Save Business Data (Using the fixed teacher_id column)
     if (type === 'teacher') {
+      // THE FIX: .upsert() with onConflict prevents the "Duplicate Key" error
       const { error: cErr } = await supabase.from('courses').upsert({ 
         course_code, 
         course_name: course_name || "General Course", 
         teacher_name: name,
         teacher_id: targetId 
-      });
+      }, { onConflict: 'course_code' });
       if (cErr) throw cErr;
     } else {
       const { error: sErr } = await supabase.from('students').upsert({ 
@@ -50,7 +48,7 @@ serve(async (req) => {
         roll_number, 
         name, 
         course_code 
-      });
+      }, { onConflict: 'roll_number' });
       if (sErr) throw sErr;
     }
 
