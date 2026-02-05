@@ -15,13 +15,12 @@ serve(async (req) => {
     const body = await req.json();
     const { action, type, email, password, name, roll_number, course_code, course_name, userId } = body;
 
-    // --- DELETE ---
     if (action === 'delete') {
       await supabase.auth.admin.deleteUser(userId);
       return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
     }
 
-    // --- CREATE / UPDATE ---
+    // 1. Find or Create Auth User
     const { data: userList } = await supabase.auth.admin.listUsers();
     let targetId = userList.users.find(u => u.email?.toLowerCase() === email.toLowerCase())?.id;
 
@@ -33,15 +32,17 @@ serve(async (req) => {
       targetId = newUser.user.id;
     }
 
+    // 2. Save Role
     await supabase.from('profiles').upsert({ id: targetId, role: type });
 
+    // 3. Save Business Data (Using the fixed teacher_id column)
     if (type === 'teacher') {
       const { error: cErr } = await supabase.from('courses').upsert({ 
         course_code, 
         course_name: course_name || "General Course", 
         teacher_name: name,
-        teacher_id: targetId // Link course to the teacher user
-      }, { onConflict: 'course_code' });
+        teacher_id: targetId 
+      });
       if (cErr) throw cErr;
     } else {
       const { error: sErr } = await supabase.from('students').upsert({ 
@@ -49,11 +50,11 @@ serve(async (req) => {
         roll_number, 
         name, 
         course_code 
-      }, { onConflict: 'roll_number' });
+      });
       if (sErr) throw sErr;
     }
 
-    return new Response(JSON.stringify({ ok: true, message: "Saved Successfully" }), { headers: corsHeaders });
+    return new Response(JSON.stringify({ ok: true, message: "Success" }), { headers: corsHeaders });
 
   } catch (err: any) {
     return new Response(JSON.stringify({ ok: false, error: err.message }), { status: 200, headers: corsHeaders });

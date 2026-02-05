@@ -32,15 +32,6 @@ export const api = {
     return await res.json();
   },
 
-  async deleteUser(token, userId) {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
-      method: 'POST',
-      headers: { ...getHeaders(token), 'x-mark-fn-api-key': MARK_FN_KEY },
-      body: JSON.stringify({ action: 'delete', userId })
-    });
-    return await res.json();
-  },
-
   async getTeachers(token) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/courses?select=*`, { headers: getHeaders(token) });
     const d = await res.json(); 
@@ -57,5 +48,14 @@ export const api = {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/courses?select=*`, { headers: getHeaders(token) });
     const d = await res.json(); 
     return Array.isArray(d) ? d : [];
+  },
+
+  async deleteUser(token, userId) {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
+      method: 'POST',
+      headers: { ...getHeaders(token), 'x-mark-fn-api-key': MARK_FN_KEY },
+      body: JSON.stringify({ action: 'delete', userId })
+    });
+    return await res.json();
   }
 };
