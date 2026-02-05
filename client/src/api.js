@@ -2,7 +2,11 @@
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const MARK_FN_KEY = import.meta.env.VITE_MARK_FN_API_KEY;
 
-const getHeaders = (token) => ({ 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${token}` });
+const getHeaders = (token) => ({ 
+  'Content-Type': 'application/json', 
+  'apikey': SUPABASE_KEY, 
+  'Authorization': `Bearer ${token}` 
+});
 
 export const api = {
   async login(email, password) {
@@ -32,28 +36,29 @@ export const api = {
     return await res.json();
   },
 
+  // GET LISTS - Simplified to ensure they show up
   async getTeachers(token) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/courses?select=*`, { headers: getHeaders(token) });
-    const d = await res.json(); 
-    return Array.isArray(d) ? d.map(t => ({ ...t, id: t.teacher_id })) : [];
+    const data = await res.json();
+    console.log("Teachers from DB:", data);
+    return Array.isArray(data) ? data : [];
   },
 
   async getStudents(token) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/students?select=*`, { headers: getHeaders(token) });
-    const d = await res.json(); 
-    return Array.isArray(d) ? d : [];
+    const data = await res.json();
+    console.log("Students from DB:", data);
+    return Array.isArray(data) ? data : [];
   },
 
   async getCourses(token) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/courses?select=*`, { headers: getHeaders(token) });
-    const d = await res.json(); 
-    return Array.isArray(d) ? d : [];
+    return await res.json();
   },
 
   async deleteUser(token, userId) {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
-      method: 'POST',
-      headers: { ...getHeaders(token), 'x-mark-fn-api-key': MARK_FN_KEY },
+      method: 'POST', headers: { ...getHeaders(token), 'x-mark-fn-api-key': MARK_FN_KEY },
       body: JSON.stringify({ action: 'delete', userId })
     });
     return await res.json();
