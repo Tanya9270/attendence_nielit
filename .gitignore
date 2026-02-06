@@ -9,3 +9,5 @@ client/dist/
 .vscode/
 *.sqlite
 *.db
+tmpclaude-*
+*.bak
