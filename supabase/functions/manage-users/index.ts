@@ -16,6 +16,11 @@ serve(async (req) => {
     const { action, type, email, password, name, roll_number, course_code, course_name, userId } = body;
 
     if (action === 'delete') {
+      // Clean up database records before deleting auth user
+      await supabase.from('students').delete().eq('user_id', userId);
+      await supabase.from('courses').delete().eq('teacher_id', userId);
+      await supabase.from('profiles').delete().eq('id', userId);
+      // Delete the auth user last
       await supabase.auth.admin.deleteUser(userId);
       return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
     }

@@ -158,6 +158,14 @@ export default function AdminPanel() {
     }
   });
 
+  // Lookup course name by code
+  const courseNameByCode = {};
+  courses.forEach(c => {
+    if (c.course_code) {
+      courseNameByCode[c.course_code] = c.course_name;
+    }
+  });
+
   const tabStyle = (tab) => ({
     padding: '12px 24px',
     border: 'none',
@@ -368,7 +376,7 @@ export default function AdminPanel() {
                           <div style={{ flex: 1 }}>
                             <strong style={{ fontSize: '15px', color: '#333' }}>{s.name}</strong>
                             <div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>
-                              Roll: {s.roll_number} | {s.course_code}
+                              Roll: {s.roll_number} | {courseNameByCode[s.course_code] || s.course_code} ({s.course_code})
                             </div>
                             {s.email && (
                               <div style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>
