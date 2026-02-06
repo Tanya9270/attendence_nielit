@@ -5,6 +5,7 @@ import QRCode from 'qrcode';
 import Navigation from './Navigation';
 import AdminPanel from './AdminPanel';
 
+// Teacher Portal Component - v2.0
 export default function TeacherPortal() {
   const [activeTab, setActiveTab] = useState('qr');
   const [attendance, setAttendance] = useState([]);
