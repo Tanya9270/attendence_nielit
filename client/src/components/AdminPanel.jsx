@@ -39,7 +39,8 @@ export default function AdminPanel() {
       ]);
       setTeachers(Array.isArray(t) ? t : []);
       setStudents(Array.isArray(s) ? s : []);
-      setCourses(Array.isArray(c) ? c : []);
+      // getCourses returns { ok: true, courses: [...] }
+      setCourses(c.ok ? (c.courses || []) : (Array.isArray(c) ? c : []));
     } catch (e) {
       console.error(e);
       setErrorMessage('Failed to load data');

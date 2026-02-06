@@ -213,6 +213,30 @@ export default function StudentPortal() {
     navigate('/');
   };
 
+  const downloadMyCSV = () => {
+    if (!attendanceStats || !attendanceStats.recentAttendance) return;
+    const headers = ['Date', 'Day', 'Status', 'Scan Time'];
+    const rows = attendanceStats.recentAttendance.map(record => [
+      new Date(record.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      new Date(record.date).toLocaleDateString('en-IN', { weekday: 'short' }),
+      record.status,
+      record.scan_time
+        ? new Date(record.scan_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+        : '-'
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const monthLabel = selectedMonth ? months.find(m => m.value === selectedMonth)?.label || selectedMonth : 'Overall';
+    a.download = `my-attendance-${monthLabel}-${selectedYear}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   if (!student) {
     return (
       <div className="container">
@@ -444,6 +468,7 @@ export default function StudentPortal() {
                       width: '100%'
                     }}
                   >
+                    <option value="2026">2026</option>
                     <option value="2025">2025</option>
                     <option value="2024">2024</option>
                   </select>
@@ -467,6 +492,18 @@ export default function StudentPortal() {
                     <span style={{ color: 'white', fontWeight: '600', fontSize: '16px' }}>
                       📅 {attendanceStats.monthName} {selectedYear}
                     </span>
+                  </div>
+
+                  {/* Export Button */}
+                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                    <button
+                      onClick={downloadMyCSV}
+                      className="btn btn-secondary"
+                      disabled={!attendanceStats.recentAttendance || attendanceStats.recentAttendance.length === 0}
+                      style={{ fontSize: '14px' }}
+                    >
+                      📥 Download Attendance CSV
+                    </button>
                   </div>
 
                   {/* Statistics Cards */}
