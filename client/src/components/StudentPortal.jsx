@@ -239,8 +239,24 @@ export default function StudentPortal() {
 
   if (!student) {
     return (
-      <div className="container">
-        <div className="loading">Loading...</div>
+      <div className="container" style={{ paddingTop: '40px' }}>
+        {error ? (
+          <div className="card" style={{ textAlign: 'center', padding: '40px' }}>
+            <div style={{ fontSize: '48px', marginBottom: '15px' }}>⚠️</div>
+            <h2 style={{ color: '#c62828', marginBottom: '10px' }}>Student Profile Not Found</h2>
+            <p style={{ color: '#666', marginBottom: '20px' }}>{error}</p>
+            <p style={{ color: '#888', fontSize: '14px' }}>Please contact your admin to ensure your student record is created.</p>
+            <button
+              onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/'); }}
+              className="btn btn-secondary"
+              style={{ marginTop: '15px' }}
+            >
+              Back to Login
+            </button>
+          </div>
+        ) : (
+          <div className="loading">Loading...</div>
+        )}
       </div>
     );
   }

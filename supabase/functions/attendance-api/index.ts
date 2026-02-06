@@ -12,6 +12,23 @@ function respond(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
 }
 
+// Helper: find student record by auth user UUID
+// Since students.user_id is INTEGER and auth IDs are UUIDs,
+// we look up the auth user's metadata to get roll_number, then query by that.
+async function findStudentByAuthId(supabase: any, authUserId: string) {
+  const { data: authUser } = await supabase.auth.admin.getUserById(authUserId);
+  const rollNumber = authUser?.user?.user_metadata?.roll_number;
+  if (rollNumber) {
+    const { data: student } = await supabase
+      .from("students")
+      .select("*")
+      .eq("roll_number", rollNumber)
+      .maybeSingle();
+    if (student) return student;
+  }
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -96,12 +113,8 @@ serve(async (req) => {
         return respond({ ok: false, error: "qr_expired", delta_seconds: delta });
       }
 
-      // Find student by auth user id (from profiles)
-      const { data: student } = await supabase
-        .from("students")
-        .select("*")
-        .eq("user_id", student_user_id)
-        .maybeSingle();
+      // Find student by auth user id (via user metadata -> roll_number)
+      const student = await findStudentByAuthId(supabase, student_user_id);
 
       if (!student) {
         return respond({ ok: false, error: "student_not_found" });
@@ -317,11 +330,7 @@ serve(async (req) => {
     if (action === "student-me") {
       const { user_id } = body;
 
-      const { data: student } = await supabase
-        .from("students")
-        .select("*")
-        .eq("user_id", user_id)
-        .maybeSingle();
+      const student = await findStudentByAuthId(supabase, user_id);
 
       if (!student) {
         return respond({ ok: false, error: "not_found" });
@@ -335,11 +344,8 @@ serve(async (req) => {
         .maybeSingle();
 
       return respond({
-        ok: true,
-        student: {
-          ...student,
-          course_name: course?.course_name || student.course_code,
-        },
+        ...student,
+        course_name: course?.course_name || student.course_code,
       });
     }
 
@@ -347,11 +353,7 @@ serve(async (req) => {
     if (action === "student-stats") {
       const { user_id, month, year } = body;
 
-      const { data: student } = await supabase
-        .from("students")
-        .select("*")
-        .eq("user_id", user_id)
-        .maybeSingle();
+      const student = await findStudentByAuthId(supabase, user_id);
 
       if (!student) {
         return respond({ ok: false, error: "not_found" });

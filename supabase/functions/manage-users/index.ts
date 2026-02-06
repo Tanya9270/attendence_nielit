@@ -121,11 +121,19 @@ serve(async (req) => {
     let targetId = userList.users.find(u => u.email?.toLowerCase() === email.toLowerCase())?.id;
 
     if (!targetId) {
+      const metadata = type === 'student'
+        ? { roll_number, name, course_code, role: 'student' }
+        : { name, course_code, role: 'teacher' };
       const { data: newUser, error: authErr } = await supabase.auth.admin.createUser({
-        email, password, email_confirm: true
+        email, password, email_confirm: true, user_metadata: metadata
       });
       if (authErr) throw authErr;
       targetId = newUser.user.id;
+    } else if (type === 'student') {
+      // Existing auth user — update metadata with roll_number
+      await supabase.auth.admin.updateUserById(targetId, {
+        user_metadata: { roll_number, name, course_code, role: 'student' }
+      });
     }
 
     // Set role in profiles
