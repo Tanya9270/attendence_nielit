@@ -4,6 +4,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { api } from '../api';
 import Navigation from './Navigation';
 
+// Student Portal Component - v2.0
 export default function StudentPortal() {
   const [student, setStudent] = useState(null);
   const [scanning, setScanning] = useState(false);
