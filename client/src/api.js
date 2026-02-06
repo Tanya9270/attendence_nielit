@@ -98,9 +98,23 @@ export const api = {
     return usersApi(token, { action: 'list', listType: 'courses' });
   },
 
-  // ── Admin: Delete User ────────────────────────────────────
+  // ── Admin: Delete User (generic) ────────────────────────
   async deleteUser(token, userId) {
     return usersApi(token, { action: 'delete', userId });
+  },
+
+  // ── Admin: Delete Teacher (by teacher_id or course_code) ─
+  async deleteTeacher(token, teacherId, courseCode) {
+    if (teacherId) {
+      return usersApi(token, { action: 'delete', deleteType: 'teacher', userId: teacherId });
+    }
+    // Fallback: delete by course_code when teacher_id is null
+    return usersApi(token, { action: 'delete', courseCode });
+  },
+
+  // ── Admin: Delete Student (by student id) ─────────────────
+  async deleteStudent(token, studentId, userId) {
+    return usersApi(token, { action: 'delete', deleteType: 'student', studentId, userId });
   },
 
   // ── Password Reset ────────────────────────────────────────

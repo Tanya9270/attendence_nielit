@@ -1,12 +1,10 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Navigation() {
-  const [showMenu, setShowMenu] = useState(false);
   const navigate = useNavigate();
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const userName = user.username || 'User';
+  const userName = user.email || user.username || 'User';
   const userRole = user.role || '-';
 
   const handleLogout = () => {
@@ -16,26 +14,30 @@ export default function Navigation() {
 
   return (
     <nav style={{
-      background: 'var(--nielit-blue)',
+      background: 'linear-gradient(135deg, #003E8E, #0066B3)',
       color: 'white',
-      padding: '15px 20px',
+      padding: '12px 20px',
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-      flexWrap: 'wrap'
+      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+      flexWrap: 'wrap',
+      gap: '10px'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <h3 style={{ margin: 0, fontSize: '18px' }}>NIELIT Attendance</h3>
+        <h3 style={{ margin: 0, fontSize: '18px', color: 'white', fontWeight: '700' }}>NIELIT Attendance</h3>
       </div>
 
-      {/* Desktop Navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
-          <div style={{ background: 'rgba(255,255,255,0.2)', padding: '5px 10px', borderRadius: '5px' }}>
-            <strong>{userName}</strong>
-            <span style={{ marginLeft: '8px', opacity: 0.8 }}>({userRole})</span>
-          </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{
+          background: 'rgba(255,255,255,0.2)',
+          padding: '6px 14px',
+          borderRadius: '6px',
+          fontSize: '13px',
+          color: 'white'
+        }}>
+          <strong style={{ color: 'white' }}>{userName}</strong>
+          <span style={{ marginLeft: '8px', opacity: 0.85, color: 'white' }}>({userRole})</span>
         </div>
         <button
           onClick={handleLogout}
@@ -43,12 +45,13 @@ export default function Navigation() {
             background: '#d32f2f',
             color: 'white',
             border: 'none',
-            padding: '8px 16px',
-            borderRadius: '5px',
+            padding: '8px 18px',
+            borderRadius: '6px',
             cursor: 'pointer',
             fontSize: '14px',
             fontWeight: 'bold',
-            transition: 'background 0.3s'
+            letterSpacing: '0.3px',
+            transition: 'background 0.2s'
           }}
           onMouseOver={(e) => e.target.style.background = '#b71c1c'}
           onMouseOut={(e) => e.target.style.background = '#d32f2f'}

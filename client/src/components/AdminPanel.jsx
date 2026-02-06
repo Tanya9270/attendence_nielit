@@ -91,22 +91,18 @@ export default function AdminPanel() {
 
   const handleDeleteTeacher = async (teacher) => {
     const name = teacher.teacher_name || 'this teacher';
-    if (!window.confirm(`Are you sure you want to delete ${name}? This will remove them from all courses and delete their account permanently.`)) {
+    if (!window.confirm(`Are you sure you want to delete ${name} (${teacher.course_code})? This will remove the course and their account.`)) {
       return;
     }
-    const userId = teacher.teacher_id;
-    if (!userId) {
-      showError('Cannot delete: teacher ID not found');
-      return;
-    }
-    setDeleting(userId);
+    const key = teacher.teacher_id || teacher.course_code;
+    setDeleting(key);
     try {
-      const res = await api.deleteUser(token, userId);
-      if (res.ok || res.message) {
+      const res = await api.deleteTeacher(token, teacher.teacher_id, teacher.course_code);
+      if (res.ok) {
         showSuccess(`${name} has been deleted`);
         loadAll();
       } else {
-        showError('Failed to delete teacher: ' + (res.error || 'Unknown error'));
+        showError('Failed to delete: ' + (res.error || 'Unknown error'));
       }
     } catch (err) {
       showError('Failed to delete teacher');
@@ -118,22 +114,17 @@ export default function AdminPanel() {
 
   const handleDeleteStudent = async (student) => {
     const name = student.name || 'this student';
-    if (!window.confirm(`Are you sure you want to delete ${name} (Roll: ${student.roll_number})? This will permanently remove their account and all attendance records.`)) {
+    if (!window.confirm(`Are you sure you want to delete ${name} (Roll: ${student.roll_number})?`)) {
       return;
     }
-    const userId = student.user_id;
-    if (!userId) {
-      showError('Cannot delete: student user ID not found');
-      return;
-    }
-    setDeleting(userId);
+    setDeleting(student.id);
     try {
-      const res = await api.deleteUser(token, userId);
-      if (res.ok || res.message) {
+      const res = await api.deleteStudent(token, student.id, student.user_id);
+      if (res.ok) {
         showSuccess(`${name} has been deleted`);
         loadAll();
       } else {
-        showError('Failed to delete student: ' + (res.error || 'Unknown error'));
+        showError('Failed to delete: ' + (res.error || 'Unknown error'));
       }
     } catch (err) {
       showError('Failed to delete student');
