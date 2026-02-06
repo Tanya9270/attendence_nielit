@@ -94,8 +94,7 @@ export default function AdminPanel() {
     if (!window.confirm(`Are you sure you want to delete ${name} (${teacher.course_code})? This will remove the course and their account.`)) {
       return;
     }
-    const key = teacher.teacher_id || teacher.course_code;
-    setDeleting(key);
+    setDeleting(teacher.course_code);
     try {
       const res = await api.deleteTeacher(token, teacher.teacher_id, teacher.course_code);
       if (res.ok) {
@@ -323,12 +322,12 @@ export default function AdminPanel() {
                               cursor: 'pointer',
                               fontSize: '12px',
                               fontWeight: 'bold',
-                              opacity: deleting === t.teacher_id ? 0.5 : 1
+                              opacity: deleting === t.course_code ? 0.5 : 1
                             }}
                             onClick={() => handleDeleteTeacher(t)}
-                            disabled={deleting === t.teacher_id}
+                            disabled={deleting === t.course_code}
                           >
-                            {deleting === t.teacher_id ? 'Deleting...' : 'Delete'}
+                            {deleting === t.course_code ? 'Deleting...' : 'Delete'}
                           </button>
                         </div>
                       ))
@@ -387,12 +386,12 @@ export default function AdminPanel() {
                               cursor: 'pointer',
                               fontSize: '12px',
                               fontWeight: 'bold',
-                              opacity: deleting === s.user_id ? 0.5 : 1
+                              opacity: deleting === s.id ? 0.5 : 1
                             }}
                             onClick={() => handleDeleteStudent(s)}
-                            disabled={deleting === s.user_id}
+                            disabled={deleting === s.id}
                           >
-                            {deleting === s.user_id ? 'Deleting...' : 'Delete'}
+                            {deleting === s.id ? 'Deleting...' : 'Delete'}
                           </button>
                         </div>
                       ))
