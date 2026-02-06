@@ -398,9 +398,8 @@ export default function TeacherPortal() {
   return (
     <>
       <Navigation />
-      <div style={{ paddingTop: '20px' }}>
+      <div className="container" style={{ paddingTop: '20px' }}>
         <div className="header">
-          <div className="header-content">
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
             <img src="/nielit-logo.svg" alt="NIELIT" style={{ height: '45px', background: 'white', padding: '5px', borderRadius: '6px' }} />
             <div>
@@ -408,21 +407,7 @@ export default function TeacherPortal() {
               <span style={{ fontSize: '11px', opacity: '0.9' }}>QR Attendance System</span>
             </div>
           </div>
-          <div className="header-right">
-            <span className="user-info">👨‍🏫 {user.username}</span>
-            {isAdmin && (
-              <button onClick={() => setActiveTab('admin')} className="btn btn-primary" style={{ marginRight: '10px', borderRadius: '6px' }}>
-                Admin
-              </button>
-            )}
-            <button onClick={handleLogout} className="btn btn-secondary" style={{ borderRadius: '6px' }}>
-              Logout
-            </button>
-          </div>
         </div>
-      </div>
-
-      <div className="container">
         {message.text && (
           <div 
             className={`alert alert-${message.type === 'error' ? 'error' : 'success'}`}
