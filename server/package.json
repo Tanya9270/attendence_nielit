@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/Tanya9270/NIELIT_Attendance#readme",
   "dependencies": {
+    "@supabase/supabase-js": "^2.95.2",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",

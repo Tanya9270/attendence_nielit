@@ -1,23 +1,50 @@
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const MARK_FN_KEY = import.meta.env.VITE_MARK_FN_API_KEY;
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 
-const supabaseHeaders = (token) => ({
+const headers = (token) => ({
   'Content-Type': 'application/json',
   'apikey': SUPABASE_KEY,
   'Authorization': `Bearer ${token}`
 });
 
-const serverHeaders = (token) => ({
-  'Content-Type': 'application/json',
-  'Authorization': `Bearer ${token}`
-});
-
-const edgeFnHeaders = (token) => ({
-  ...supabaseHeaders(token),
+const edgeFn = (token) => ({
+  ...headers(token),
   'x-mark-fn-api-key': MARK_FN_KEY
 });
+
+// Helper: call the attendance-api edge function
+async function attApi(token, body) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/attendance-api`, {
+    method: 'POST',
+    headers: edgeFn(token),
+    body: JSON.stringify(body)
+  });
+  return await res.json();
+}
+
+// Helper: call the manage-users edge function
+async function usersApi(token, body) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
+    method: 'POST',
+    headers: edgeFn(token),
+    body: JSON.stringify(body)
+  });
+  return await res.json();
+}
+
+// Helper: get current user from localStorage
+function getCurrentUser() {
+  return JSON.parse(localStorage.getItem('user') || '{}');
+}
+
+// Helper: generate CSV blob from data
+function generateCSV(headersRow, rows) {
+  const escape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = [headersRow.map(escape).join(',')];
+  rows.forEach(r => lines.push(r.map(escape).join(',')));
+  return new Blob([lines.join('\n')], { type: 'text/csv' });
+}
 
 export const api = {
   // ── Auth ──────────────────────────────────────────────────
@@ -30,7 +57,7 @@ export const api = {
     const data = await res.json();
     if (!res.ok) return { ok: false };
     const prof = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${data.user.id}&select=role`, {
-      headers: supabaseHeaders(data.access_token)
+      headers: headers(data.access_token)
     });
     const pData = await prof.json();
     return {
@@ -42,216 +69,167 @@ export const api = {
 
   // ── Admin: Create Teacher ─────────────────────────────────
   async createTeacher(token, name, email, password, code, courseName) {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
-      method: 'POST',
-      headers: edgeFnHeaders(token),
-      body: JSON.stringify({ type: 'teacher', email, password, name, course_code: code, course_name: courseName })
-    });
-    return await res.json();
+    return usersApi(token, { type: 'teacher', email, password, name, course_code: code, course_name: courseName });
   },
 
   // ── Admin: Create Student ─────────────────────────────────
   async createStudent(token, name, email, roll, password, code) {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
-      method: 'POST',
-      headers: edgeFnHeaders(token),
-      body: JSON.stringify({ type: 'student', email, roll_number: roll, name, password, course_code: code })
-    });
-    return await res.json();
+    return usersApi(token, { type: 'student', email, roll_number: roll, name, password, course_code: code });
   },
 
-  // ── Admin: Get Teachers (via edge function - bypasses RLS) ─
+  // ── Admin: Get Teachers ───────────────────────────────────
   async getTeachers(token) {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
-      method: 'POST',
-      headers: edgeFnHeaders(token),
-      body: JSON.stringify({ action: 'list', listType: 'teachers' })
-    });
-    const data = await res.json();
+    const data = await usersApi(token, { action: 'list', listType: 'teachers' });
     return Array.isArray(data) ? data : [];
   },
 
-  // ── Admin: Get Students (via edge function - bypasses RLS) ─
+  // ── Admin: Get Students ───────────────────────────────────
   async getStudents(token) {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
-      method: 'POST',
-      headers: edgeFnHeaders(token),
-      body: JSON.stringify({ action: 'list', listType: 'students' })
-    });
-    const data = await res.json();
+    const data = await usersApi(token, { action: 'list', listType: 'students' });
     return Array.isArray(data) ? data : [];
   },
 
-  // ── Get Courses (via edge function - bypasses RLS) ────────
-  // Returns { ok: true, courses: [...] }
+  // ── Get Courses ───────────────────────────────────────────
   async getCourses(token) {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
-      method: 'POST',
-      headers: edgeFnHeaders(token),
-      body: JSON.stringify({ action: 'list', listType: 'courses' })
-    });
-    return await res.json();
+    const user = getCurrentUser();
+    if (user.role === 'teacher') {
+      return attApi(token, { action: 'get-courses', teacher_id: user.id });
+    }
+    return usersApi(token, { action: 'list', listType: 'courses' });
   },
 
   // ── Admin: Delete User ────────────────────────────────────
   async deleteUser(token, userId) {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
-      method: 'POST',
-      headers: edgeFnHeaders(token),
-      body: JSON.stringify({ action: 'delete', userId })
-    });
-    return await res.json();
+    return usersApi(token, { action: 'delete', userId });
   },
 
   // ── Password Reset ────────────────────────────────────────
   async forgotPassword(email) {
-    const res = await fetch(`${SERVER_URL}/api/forgot-password`, {
+    const { error } = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
       body: JSON.stringify({ email })
-    });
-    return await res.json();
+    }).then(r => r.json());
+    return { ok: !error, error: error?.message };
   },
 
   async resetPassword(email, token, password) {
-    const res = await fetch(`${SERVER_URL}/api/reset-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, token, password })
-    });
-    return await res.json();
+    // Supabase handles password reset via the recovery flow
+    return { ok: true, message: 'Use the link sent to your email' };
   },
 
   // ── Server Time (for QR sync) ─────────────────────────────
   async getServerTime() {
-    const res = await fetch(`${SERVER_URL}/api/server-time`);
-    return await res.json();
+    return attApi('', { action: 'server-time' });
   },
 
   // ── Attendance: Daily ─────────────────────────────────────
   async getDailyAttendance(token, date, className, section, courseCode) {
-    const params = new URLSearchParams({ date });
-    if (className) params.append('class', className);
-    if (section) params.append('section', section);
-    if (courseCode) params.append('course_code', courseCode);
-    const res = await fetch(`${SERVER_URL}/api/attendance/daily?${params}`, {
-      headers: serverHeaders(token)
-    });
-    return await res.json();
+    return attApi(token, { action: 'get-daily', date, course_code: courseCode });
   },
 
   // ── Attendance: Monthly ───────────────────────────────────
   async getMonthlyAttendance(token, month, year, className, section, courseCode) {
-    const params = new URLSearchParams({ month: String(month), year: String(year) });
-    if (className) params.append('class', className);
-    if (section) params.append('section', section);
-    if (courseCode) params.append('course_code', courseCode);
-    const res = await fetch(`${SERVER_URL}/api/attendance/monthly?${params}`, {
-      headers: serverHeaders(token)
-    });
-    return await res.json();
+    return attApi(token, { action: 'get-monthly', month, year, course_code: courseCode });
   },
 
   // ── Attendance: Finalize ──────────────────────────────────
   async finalizeAttendance(token, date, className, section, courseCode) {
-    const res = await fetch(`${SERVER_URL}/api/attendance/finalize`, {
-      method: 'POST',
-      headers: serverHeaders(token),
-      body: JSON.stringify({ date, class: className, section, course_code: courseCode })
-    });
-    return await res.json();
+    return attApi(token, { action: 'finalize', date, course_code: courseCode });
   },
 
   // ── Attendance: Student Self-Mark ─────────────────────────
   async markMyAttendance(token, qrPayload) {
-    const res = await fetch(`${SERVER_URL}/api/attendance/mark-self`, {
-      method: 'POST',
-      headers: serverHeaders(token),
-      body: JSON.stringify({ qr_payload: qrPayload })
-    });
-    return await res.json();
+    const user = getCurrentUser();
+    return attApi(token, { action: 'mark-self', qr_payload: qrPayload, student_user_id: user.id });
   },
 
-  // ── Export: Daily PDF ─────────────────────────────────────
+  // ── Export: Daily PDF (client-side generation) ────────────
   async exportDailyPDF(token, date, className, section, courseCode) {
-    const params = new URLSearchParams({ date });
-    if (className) params.append('class', className);
-    if (section) params.append('section', section);
-    if (courseCode) params.append('course_code', courseCode);
-    const res = await fetch(`${SERVER_URL}/api/export/daily/pdf?${params}`, {
-      headers: serverHeaders(token)
-    });
-    if (!res.ok) throw new Error('Failed to generate PDF');
-    return await res.blob();
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+
+    const students = data.students || [];
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Course', 'Status', 'Scan Time'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.course_code,
+      s.status,
+      s.scan_time ? new Date(s.scan_time).toLocaleTimeString('en-IN') : '-'
+    ]);
+    return generateCSV(hdrs, rows);
   },
 
   // ── Export: Daily CSV ─────────────────────────────────────
   async exportDailyCSV(token, date, className, section, courseCode) {
-    const params = new URLSearchParams({ date });
-    if (className) params.append('class', className);
-    if (section) params.append('section', section);
-    if (courseCode) params.append('course_code', courseCode);
-    const res = await fetch(`${SERVER_URL}/api/export/daily/csv?${params}`, {
-      headers: serverHeaders(token)
-    });
-    if (!res.ok) throw new Error('Failed to generate CSV');
-    return await res.blob();
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+
+    const students = data.students || [];
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Course', 'Status', 'Scan Time'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.course_code,
+      s.status,
+      s.scan_time ? new Date(s.scan_time).toLocaleTimeString('en-IN') : '-'
+    ]);
+    return generateCSV(hdrs, rows);
   },
 
-  // ── Export: Monthly PDF ───────────────────────────────────
+  // ── Export: Monthly PDF (client-side CSV) ──────────────────
   async exportMonthlyPDF(token, month, year, className, section, courseCode) {
-    const params = new URLSearchParams({ month: String(month), year: String(year) });
-    if (className) params.append('class', className);
-    if (section) params.append('section', section);
-    if (courseCode) params.append('course_code', courseCode);
-    const res = await fetch(`${SERVER_URL}/api/export/monthly/pdf?${params}`, {
-      headers: serverHeaders(token)
-    });
-    if (!res.ok) throw new Error('Failed to generate PDF');
-    return await res.blob();
+    const data = await attApi(token, { action: 'get-monthly', month, year, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load monthly data');
+
+    const students = data.students || [];
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
   },
 
   // ── Export: Monthly CSV ───────────────────────────────────
   async exportMonthlyCSV(token, month, year, className, section, courseCode) {
-    const params = new URLSearchParams({ month: String(month), year: String(year) });
-    if (className) params.append('class', className);
-    if (section) params.append('section', section);
-    if (courseCode) params.append('course_code', courseCode);
-    const res = await fetch(`${SERVER_URL}/api/export/monthly/csv?${params}`, {
-      headers: serverHeaders(token)
-    });
-    if (!res.ok) throw new Error('Failed to generate CSV');
-    return await res.blob();
+    const data = await attApi(token, { action: 'get-monthly', month, year, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load monthly data');
+
+    const students = data.students || [];
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
   },
 
   // ── Export: Legacy CSV ────────────────────────────────────
   async exportAttendance(token, date, className, section, courseCode) {
-    const params = new URLSearchParams({ date });
-    if (className) params.append('class', className);
-    if (section) params.append('section', section);
-    if (courseCode) params.append('course_code', courseCode);
-    const res = await fetch(`${SERVER_URL}/api/attendance/export?${params}`, {
-      headers: serverHeaders(token)
-    });
-    return await res.blob();
+    return this.exportDailyCSV(token, date, className, section, courseCode);
   },
 
   // ── Student: Get My Profile ───────────────────────────────
   async getStudentMe(token) {
-    const res = await fetch(`${SERVER_URL}/api/students/me`, {
-      headers: serverHeaders(token)
-    });
-    return await res.json();
+    const user = getCurrentUser();
+    return attApi(token, { action: 'student-me', user_id: user.id });
   },
 
   // ── Student: Get Attendance Stats ─────────────────────────
   async getStudentAttendanceStatsByMonth(token, month, year) {
-    const params = new URLSearchParams();
-    if (month) params.append('month', String(month));
-    if (year) params.append('year', String(year));
-    const res = await fetch(`${SERVER_URL}/api/students/me/attendance-stats?${params}`, {
-      headers: serverHeaders(token)
-    });
-    return await res.json();
+    const user = getCurrentUser();
+    return attApi(token, { action: 'student-stats', user_id: user.id, month, year });
   }
 };
