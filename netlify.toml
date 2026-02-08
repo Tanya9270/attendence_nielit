@@ -9,3 +9,5 @@
 
 [context.production.environment]
   NODE_ENV = "production"
+  VITE_SUPABASE_URL = "https://pxdvfzwzoviwiwhezzjd.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4ZHZmend6b3Zpd2l3aGV6empkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg5NzM5MTIsImV4cCI6MjA4NDU0OTkxMn0.1O24gKdPiWIg5ERX7tJOvQGVeUQFd6dymPFKWuqihH8"

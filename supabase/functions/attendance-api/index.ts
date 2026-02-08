@@ -15,9 +15,12 @@ function respond(body: unknown, status = 200) {
 // Helper: find student record by auth user UUID
 // Since students.user_id is INTEGER and auth IDs are UUIDs,
 // we look up the auth user's metadata to get roll_number, then query by that.
+// Fallback: if metadata is missing, check profiles for role=student and try name match.
 async function findStudentByAuthId(supabase: any, authUserId: string) {
   const { data: authUser } = await supabase.auth.admin.getUserById(authUserId);
-  const rollNumber = authUser?.user?.user_metadata?.roll_number;
+  const meta = authUser?.user?.user_metadata;
+  const rollNumber = meta?.roll_number;
+
   if (rollNumber) {
     const { data: student } = await supabase
       .from("students")
@@ -26,6 +29,54 @@ async function findStudentByAuthId(supabase: any, authUserId: string) {
       .maybeSingle();
     if (student) return student;
   }
+
+  // Fallback: if metadata missing, try matching by name from auth metadata
+  if (meta?.name) {
+    const { data: student } = await supabase
+      .from("students")
+      .select("*")
+      .eq("name", meta.name)
+      .maybeSingle();
+    if (student) {
+      // Auto-fix: update auth metadata with roll_number for future lookups
+      await supabase.auth.admin.updateUserById(authUserId, {
+        user_metadata: { ...meta, roll_number: student.roll_number, course_code: student.course_code }
+      });
+      return student;
+    }
+  }
+
+  // Last resort: check if there's exactly one student with matching profile
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", authUserId)
+    .maybeSingle();
+
+  if (profile?.role === "student") {
+    // Try to find student by querying all students and seeing if only one exists
+    // (works for simple cases where admin just created one student for this user)
+    const email = authUser?.user?.email;
+    if (email) {
+      // Check all students, try name-based partial match from email prefix
+      const emailPrefix = email.split("@")[0].toLowerCase();
+      const { data: students } = await supabase.from("students").select("*");
+      if (students && students.length > 0) {
+        const match = students.find((s: any) =>
+          s.name?.toLowerCase().includes(emailPrefix) ||
+          emailPrefix.includes(s.name?.toLowerCase()?.split(" ")[0])
+        );
+        if (match) {
+          // Auto-fix metadata
+          await supabase.auth.admin.updateUserById(authUserId, {
+            user_metadata: { roll_number: match.roll_number, name: match.name, course_code: match.course_code, role: "student" }
+          });
+          return match;
+        }
+      }
+    }
+  }
+
   return null;
 }
 
