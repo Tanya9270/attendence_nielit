@@ -2,6 +2,10 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const MARK_FN_KEY = import.meta.env.VITE_MARK_FN_API_KEY;
 
+// Import jsPDF and autoTable at module level
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+
 const headers = (token) => ({
   'Content-Type': 'application/json',
   'apikey': SUPABASE_KEY,
@@ -48,8 +52,6 @@ function generateCSV(headersRow, rows) {
 
 // Helper: generate PDF blob from table data
 async function generatePDF(title, headersRow, rows) {
-  const { jsPDF } = await import('jspdf');
-  await import('jspdf-autotable');
   const doc = new jsPDF();
 
   // Add title
