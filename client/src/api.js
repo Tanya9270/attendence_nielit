@@ -49,6 +49,7 @@ function generateCSV(headersRow, rows) {
 // Helper: generate PDF blob from table data
 async function generatePDF(title, headersRow, rows) {
   const { jsPDF } = await import('jspdf');
+  await import('jspdf-autotable');
   const doc = new jsPDF();
 
   // Add title

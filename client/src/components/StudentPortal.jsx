@@ -241,6 +241,7 @@ export default function StudentPortal() {
     if (!attendanceStats || !attendanceStats.recentAttendance) return;
     try {
       const { jsPDF } = await import('jspdf');
+      await import('jspdf-autotable');
       const doc = new jsPDF();
 
       // Add title
