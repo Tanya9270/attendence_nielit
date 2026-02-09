@@ -684,23 +684,6 @@ export default function TeacherPortal() {
                       marginTop: '5px'
                     }}>
                       <button
-                        onClick={handleExportDailyPDF}
-                        style={{
-                          display: 'block',
-                          width: '100%',
-                          padding: '12px 15px',
-                          border: 'none',
-                          background: 'none',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          fontSize: '14px'
-                        }}
-                        onMouseOver={(e) => e.target.style.background = '#f5f5f5'}
-                        onMouseOut={(e) => e.target.style.background = 'none'}
-                      >
-                        📊 Export as CSV
-                      </button>
-                      <button 
                         onClick={handleExportDailyCSV}
                         style={{
                           display: 'block',
@@ -922,23 +905,6 @@ export default function TeacherPortal() {
                       marginTop: '5px'
                     }}>
                       <button
-                        onClick={handleExportMonthlyPDF}
-                        style={{
-                          display: 'block',
-                          width: '100%',
-                          padding: '12px 15px',
-                          border: 'none',
-                          background: 'none',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          fontSize: '14px'
-                        }}
-                        onMouseOver={(e) => e.target.style.background = '#f5f5f5'}
-                        onMouseOut={(e) => e.target.style.background = 'none'}
-                      >
-                        📊 Export as CSV
-                      </button>
-                      <button 
                         onClick={handleExportMonthlyCSV}
                         style={{
                           display: 'block',
