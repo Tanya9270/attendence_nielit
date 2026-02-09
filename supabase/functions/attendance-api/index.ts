@@ -272,6 +272,27 @@ serve(async (req) => {
       if (course_code) studentsQuery = studentsQuery.eq("course_code", course_code);
       const { data: students } = await studentsQuery;
 
+      // Get course information to include course_name and faculty
+      let courseInfo: any = { course_code: course_code || '', course_name: '', faculty: '[Faculty Name]' };
+      if (course_code) {
+        const { data: course } = await supabase
+          .from("courses")
+          .select("*")
+          .eq("course_code", course_code)
+          .maybeSingle();
+        if (course) {
+          courseInfo.course_name = course.name || course.course_name || course.course_code;
+          // If course has teacher_id, fetch teacher name; otherwise use course fields if available
+          if (course.teacher_name) {
+            courseInfo.faculty = course.teacher_name;
+          } else if (course.faculty_name) {
+            courseInfo.faculty = course.faculty_name;
+          } else if (course.faculty) {
+            courseInfo.faculty = course.faculty;
+          }
+        }
+      }
+
       if (!students || students.length === 0) {
         return respond({
           ok: true,
@@ -280,6 +301,9 @@ serve(async (req) => {
           month: m,
           year: y,
           monthName: new Date(y, m - 1).toLocaleString("en-US", { month: "long" }),
+          course_code: courseInfo.course_code,
+          course_name: courseInfo.course_name,
+          faculty: courseInfo.faculty,
         });
       }
 
@@ -350,6 +374,9 @@ serve(async (req) => {
         year: y,
         monthName: new Date(y, m - 1).toLocaleString("en-US", { month: "long" }),
         dates: allDates,
+        course_code: courseInfo.course_code,
+        course_name: courseInfo.course_name,
+        faculty: courseInfo.faculty,
       });
     }
 

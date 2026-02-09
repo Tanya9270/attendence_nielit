@@ -123,7 +123,7 @@ async function generatePDF(title, headersRow, rows) {
 }
 
 // Helper: generate calendar-style PDF for monthly class attendance
-async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthName, year, students, attendanceData) {
+async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthName, year, students, attendanceData, faculty = '[Faculty Name]') {
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF('landscape');
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -169,7 +169,7 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
   doc.text(courseName, pageWidth / 2, yPosition, { align: 'center' });
   yPosition += 3;
 
-  doc.text(`Faculty: [Faculty Name]`, pageWidth / 2, yPosition, { align: 'center' });
+  doc.text(`Faculty: ${faculty}`, pageWidth / 2, yPosition, { align: 'center' });
   yPosition += 5;
 
   const monthMap = { 'January': 1, 'February': 2, 'March': 3, 'April': 4, 'May': 5, 'June': 6,
@@ -569,6 +569,7 @@ export const api = {
 
     const students = data.students || [];
     const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
     const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
 
     // Build attendance data map: {studentId: {DD-MM-YYYY: 'P'/'A'/'L'}}
@@ -596,7 +597,8 @@ export const api = {
       monthName,
       year,
       students,
-      attendanceMap
+      attendanceMap,
+      faculty
     );
   },
 
