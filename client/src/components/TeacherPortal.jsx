@@ -700,23 +700,6 @@ export default function TeacherPortal() {
                       >
                         📄 Export as PDF
                       </button>
-                      <button
-                        onClick={handleExportDailyCSV}
-                        style={{
-                          display: 'block',
-                          width: '100%',
-                          padding: '12px 15px',
-                          border: 'none',
-                          background: 'none',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          fontSize: '14px'
-                        }}
-                        onMouseOver={(e) => e.target.style.background = '#f5f5f5'}
-                        onMouseOut={(e) => e.target.style.background = 'none'}
-                      >
-                        📊 Export as CSV
-                      </button>
                     </div>
                   )}
                 </div>
@@ -937,23 +920,6 @@ export default function TeacherPortal() {
                         onMouseOut={(e) => e.target.style.background = 'none'}
                       >
                         📄 Export as PDF
-                      </button>
-                      <button
-                        onClick={handleExportMonthlyCSV}
-                        style={{
-                          display: 'block',
-                          width: '100%',
-                          padding: '12px 15px',
-                          border: 'none',
-                          background: 'none',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          fontSize: '14px'
-                        }}
-                        onMouseOver={(e) => e.target.style.background = '#f5f5f5'}
-                        onMouseOut={(e) => e.target.style.background = 'none'}
-                      >
-                        📊 Export as CSV
                       </button>
                     </div>
                   )}

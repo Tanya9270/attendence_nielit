@@ -280,7 +280,7 @@ export default function StudentPortal() {
 
       doc.setFont(undefined, 'bold');
       doc.setTextColor(0, 102, 179);
-      doc.text(`Course Code: ${student.course_code}`, pageWidth / 2, yPosition, { align: 'center' });
+      doc.text(`${student.course_code}`, pageWidth / 2, yPosition, { align: 'center' });
       yPosition += 4;
 
       doc.setFont(undefined, 'normal');
@@ -302,7 +302,7 @@ export default function StudentPortal() {
       yPosition += 4;
 
       doc.text(
-        `Total Students: 1 | Overall Attendance: ${attendanceStats.stats.percentage}%`,
+        `Total Students: 1`,
         pageWidth / 2,
         yPosition,
         { align: 'center' }
@@ -342,7 +342,14 @@ export default function StudentPortal() {
       for (let day = 1; day <= lastDay; day++) {
         const isSessionDay = attendanceMap[day] ? true : false;
 
-        if (isSessionDay) {
+        // Check if it's weekend (Saturday=6, Sunday=0)
+        const dateObj = new Date(selectedYear, parseInt(selectedMonth) - 1, day);
+        const dayOfWeek = dateObj.getDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
+
+        if (isWeekend) {
+          doc.setFillColor(255, 200, 200); // Light red for weekends
+        } else if (isSessionDay) {
           doc.setFillColor(144, 238, 144); // Light green for session days
         } else {
           doc.setFillColor(220, 220, 220); // Gray for non-session days
@@ -355,7 +362,10 @@ export default function StudentPortal() {
         doc.setFontSize(6);
         doc.setFont(undefined, 'bold');
         doc.setTextColor(0, 0, 0);
-        doc.text(day.toString(), xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
+
+        // Show day number or OFF for weekends
+        const dayText = isWeekend ? 'OFF' : day.toString();
+        doc.text(dayText, xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
 
         xPos += dayWidth;
       }
@@ -758,14 +768,6 @@ export default function StudentPortal() {
                       style={{ fontSize: '14px' }}
                     >
                       📄 Download as PDF
-                    </button>
-                    <button
-                      onClick={downloadMyCSV}
-                      className="btn btn-secondary"
-                      disabled={!attendanceStats.recentAttendance || attendanceStats.recentAttendance.length === 0}
-                      style={{ fontSize: '14px' }}
-                    >
-                      📊 Download as CSV
                     </button>
                   </div>
 

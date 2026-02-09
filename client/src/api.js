@@ -161,7 +161,7 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
   doc.setFontSize(9);
   doc.setFont(undefined, 'bold');
   doc.setTextColor(0, 102, 179);
-  doc.text(`Course Code: ${courseCode}`, pageWidth / 2, yPosition, { align: 'center' });
+  doc.text(`${courseCode}`, pageWidth / 2, yPosition, { align: 'center' });
   yPosition += 4;
 
   doc.setFont(undefined, 'normal');
@@ -190,7 +190,7 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
   yPosition += 4;
 
   doc.text(
-    `Total Students: ${students.length} | Overall Attendance: [Calc]%`,
+    `Total Students: ${students.length}`,
     pageWidth / 2,
     yPosition,
     { align: 'center' }
@@ -218,7 +218,14 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
     // Check if this is a session day (at least one student has attendance for this day)
     const isSessionDay = students.some(s => attendanceData[s.student_id]?.[day.toString().padStart(2, '0')]);
 
-    if (isSessionDay) {
+    // Check if it's weekend (Saturday=6, Sunday=0)
+    const dateObj = new Date(year, monthNum - 1, day);
+    const dayOfWeek = dateObj.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
+
+    if (isWeekend) {
+      doc.setFillColor(255, 200, 200); // Light red for weekends
+    } else if (isSessionDay) {
       doc.setFillColor(100, 180, 100); // Green for session days
     } else {
       doc.setFillColor(200, 200, 200); // Gray for non-session days
@@ -231,7 +238,10 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
     doc.setFontSize(5);
     doc.setFont(undefined, 'bold');
     doc.setTextColor(0, 0, 0);
-    doc.text(day.toString(), xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
+
+    // Show day number or OFF for weekends
+    const dayText = isWeekend ? 'OFF' : day.toString();
+    doc.text(dayText, xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
 
     xPos += dayWidth;
   }
@@ -268,7 +278,15 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
       xPos = margin + 50;
       for (let day = 1; day <= lastDay; day++) {
         const isSessionDay = students.some(s => attendanceData[s.student_id]?.[day.toString().padStart(2, '0')]);
-        if (isSessionDay) {
+
+        // Check if it's weekend (Saturday=6, Sunday=0)
+        const dateObj = new Date(year, monthNum - 1, day);
+        const dayOfWeek = dateObj.getDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
+
+        if (isWeekend) {
+          doc.setFillColor(255, 200, 200); // Light red for weekends
+        } else if (isSessionDay) {
           doc.setFillColor(100, 180, 100);
         } else {
           doc.setFillColor(200, 200, 200);
@@ -279,7 +297,10 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
         doc.setFontSize(5);
         doc.setFont(undefined, 'bold');
         doc.setTextColor(0, 0, 0);
-        doc.text(day.toString(), xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
+
+        // Show day number or OFF for weekends
+        const dayText = isWeekend ? 'OFF' : day.toString();
+        doc.text(dayText, xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
         xPos += dayWidth;
       }
 
