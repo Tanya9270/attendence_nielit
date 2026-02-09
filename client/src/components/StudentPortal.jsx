@@ -312,6 +312,56 @@ export default function StudentPortal() {
 
       yPosition += cellHeight + 1;
 
+      // === STUDENT ATTENDANCE ROW ===
+      // Draw student name label
+      doc.setFillColor(240, 240, 240);
+      doc.setTextColor(50, 50, 50);
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(8);
+      doc.rect(margin, yPosition - cellHeight + 1, dayWidth, cellHeight, 'F');
+      doc.setDrawColor(200, 200, 200);
+      doc.rect(margin, yPosition - cellHeight + 1, dayWidth, cellHeight);
+      const studentNameShort = student.roll_number?.substring(0, 10) || student.name?.substring(0, 10);
+      doc.text(studentNameShort, margin + 2, yPosition - 1);
+
+      // Draw attendance cells for each day
+      xPos = margin + dayWidth;
+      for (let day = 1; day <= lastDay; day++) {
+        // Create date key for lookup
+        const dateStr = `${day.toString().padStart(2, '0')}-${(selectedMonth || '01').toString().padStart(2, '0')}-${selectedYear}`;
+        const cellContent = attendanceMap[dateStr] || '-';
+
+        // Alternate cell colors
+        if (day % 2 === 0) {
+          doc.setFillColor(245, 245, 245);
+        } else {
+          doc.setFillColor(255, 255, 255);
+        }
+
+        doc.rect(xPos, yPosition - cellHeight + 1, dayWidth, cellHeight, 'F');
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(xPos, yPosition - cellHeight + 1, dayWidth, cellHeight);
+
+        // Set text color based on status
+        if (cellContent === 'P') {
+          doc.setTextColor(45, 125, 50); // Green for present
+        } else if (cellContent === 'A') {
+          doc.setTextColor(198, 40, 40); // Red for absent
+        } else if (cellContent === 'L') {
+          doc.setTextColor(230, 81, 0); // Orange for leave
+        } else {
+          doc.setTextColor(150, 150, 150); // Gray for no data
+        }
+
+        doc.setFont(undefined, 'bold');
+        doc.setFontSize(10);
+        doc.text(cellContent, xPos + dayWidth / 2 - 2, yPosition - 1, { align: 'center' });
+
+        xPos += dayWidth;
+      }
+
+      yPosition += cellHeight + 1;
+
       // === LEGEND & STATISTICS ===
       // Draw legend next to calendar
       const legendX = margin + dayWidth * (lastDay + 1) + 5;

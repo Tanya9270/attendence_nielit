@@ -158,38 +158,32 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
   doc.text(`Total Students: ${students.length}`, margin + infoColWidth * 2, yPosition);
   yPosition += 8;
 
-  // === CALENDAR HEADER ===
+  // === CALENDAR GRID ===
+  // Determine last day of month
+  const monthMap = { 'January': 1, 'February': 2, 'March': 3, 'April': 4, 'May': 5, 'June': 6,
+                     'July': 7, 'August': 8, 'September': 9, 'October': 10, 'November': 11, 'December': 12 };
+  const monthNum = monthMap[monthName] || 1;
+  const lastDay = new Date(year, monthNum, 0).getDate();
+
+  // Calculate cell dimensions
+  const dayWidth = (pageWidth - 2 * margin - 50) / lastDay; // 50 for student name column
+  const cellHeight = 4;
+
+  // === CALENDAR HEADER ROW ===
   doc.setFillColor(0, 102, 179);
   doc.setTextColor(255, 255, 255);
   doc.setFont(undefined, 'bold');
-  doc.setFontSize(7);
-
-  const monthDate = new Date(year, parseInt(monthName.split('-')[1]) - 1 || 0, 1);
-  const lastDay = new Date(year, parseInt(monthName.split('-')[1]) || 11, 0).getDate();
-
-  // Detect month number from monthName if it contains "-"
-  let monthNum = 0;
-  if (monthName && typeof monthName === 'string') {
-    const monthMap = { 'January': 1, 'February': 2, 'March': 3, 'April': 4, 'May': 5, 'June': 6,
-                       'July': 7, 'August': 8, 'September': 9, 'October': 10, 'November': 11, 'December': 12 };
-    monthNum = monthMap[monthName] || 0;
-  }
-  const actualLastDay = monthNum ? new Date(year, monthNum, 0).getDate() : 31;
-
-  const dayWidth = (pageWidth - 2 * margin - 40) / actualLastDay;
-  const cellHeight = 5;
-  let xPos = margin + 40; // Space for student names
-
-  // Empty cell for name space
-  doc.rect(margin, yPosition - cellHeight + 0.5, 40, cellHeight, 'F');
   doc.setFontSize(6);
+
+  // Student name header
+  doc.rect(margin, yPosition - cellHeight + 0.5, 50, cellHeight, 'F');
   doc.text('Student', margin + 2, yPosition - 1);
 
-  // Day numbers (1-31)
-  for (let day = 1; day <= actualLastDay; day++) {
+  // Day numbers
+  let xPos = margin + 50;
+  for (let day = 1; day <= lastDay; day++) {
     doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight, 'F');
-    doc.setFontSize(6);
-    doc.text(String(day), xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
+    doc.text(day.toString(), xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
     xPos += dayWidth;
   }
 
@@ -201,37 +195,73 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
   doc.setFontSize(6);
 
   students.forEach((student, idx) => {
-    if (yPosition > pageHeight - 10) {
+    // Check if we need a new page
+    if (yPosition > pageHeight - 15) {
       doc.addPage('landscape');
       yPosition = margin;
+
+      // Redraw header on new page
+      doc.setFillColor(0, 102, 179);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(6);
+
+      doc.rect(margin, yPosition - cellHeight + 0.5, 50, cellHeight, 'F');
+      doc.text('Student', margin + 2, yPosition - 1);
+
+      xPos = margin + 50;
+      for (let day = 1; day <= lastDay; day++) {
+        doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight, 'F');
+        doc.text(day.toString(), xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
+        xPos += dayWidth;
+      }
+
+      yPosition += cellHeight;
+      doc.setTextColor(50, 50, 50);
+      doc.setFont(undefined, 'normal');
     }
 
-    // Student name box
+    // Student name cell
     const bgColor = idx % 2 === 0 ? [240, 240, 240] : [255, 255, 255];
     doc.setFillColor(...bgColor);
-    doc.rect(margin, yPosition - cellHeight + 0.5, 40, cellHeight, 'F');
+    doc.rect(margin, yPosition - cellHeight + 0.5, 50, cellHeight, 'F');
     doc.setDrawColor(200, 200, 200);
-    doc.rect(margin, yPosition - cellHeight + 0.5, 40, cellHeight);
+    doc.rect(margin, yPosition - cellHeight + 0.5, 50, cellHeight);
 
-    const nameText = student.roll_number || student.name;
-    doc.text(nameText.substring(0, 12), margin + 2, yPosition - 1);
+    const studentLabel = student.roll_number || student.name;
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, 'bold');
+    doc.text(studentLabel.substring(0, 10), margin + 2, yPosition - 1);
 
     // Attendance cells for each day
-    xPos = margin + 40;
-    for (let day = 1; day <= actualLastDay; day++) {
+    xPos = margin + 50;
+    for (let day = 1; day <= lastDay; day++) {
       doc.setFillColor(...bgColor);
       doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight, 'F');
       doc.setDrawColor(200, 200, 200);
       doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight);
 
-      // Look up attendance status for this student and day
-      const dateStr = `${day.toString().padStart(2, '0')}-${monthNum.toString().padStart(2, '0')}-${year}`;
-      const studentAttendance = attendanceData[student.id]?.[dateStr];
-      if (studentAttendance) {
-        doc.setTextColor(0, 102, 179);
-        doc.text(studentAttendance, xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
-        doc.setTextColor(50, 50, 50);
+      // Get attendance status
+      const dayStr = day.toString().padStart(2, '0');
+      const attendanceStatus = attendanceData[student.student_id]?.[dayStr];
+      let cellSymbol = '-';
+      let symbolColor = [150, 150, 150];
+
+      if (attendanceStatus === 'P') {
+        cellSymbol = '✓';
+        symbolColor = [45, 125, 50]; // Green
+      } else if (attendanceStatus === 'A') {
+        cellSymbol = '✗';
+        symbolColor = [198, 40, 40]; // Red
+      } else if (attendanceStatus === 'L') {
+        cellSymbol = 'L';
+        symbolColor = [230, 81, 0]; // Orange
       }
+
+      doc.setTextColor(...symbolColor);
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(7);
+      doc.text(cellSymbol, xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
 
       xPos += dayWidth;
     }
@@ -240,7 +270,7 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
   });
 
   // === LEGEND ===
-  yPosition += 3;
+  yPosition += 2;
   doc.setFontSize(7);
   doc.setFont(undefined, 'bold');
   doc.setTextColor(0, 102, 179);
@@ -248,7 +278,19 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
 
   doc.setFont(undefined, 'normal');
   doc.setTextColor(50, 50, 50);
-  doc.text('P = Present  |  A = Absent  |  L = Leave  |  H = Holiday  |  W = Weekend', margin + 15, yPosition);
+  const legendItems = [
+    { text: 'P = Present', color: [45, 125, 50] },
+    { text: 'A = Absent', color: [198, 40, 40] },
+    { text: 'L = Leave', color: [230, 81, 0] },
+    { text: '- = No Session', color: [150, 150, 150] }
+  ];
+
+  let legendX = margin + 20;
+  legendItems.forEach((item) => {
+    doc.setTextColor(...item.color);
+    doc.text(item.text, legendX, yPosition);
+    legendX += 30;
+  });
 
   // Add footer
   doc.setFontSize(6);
