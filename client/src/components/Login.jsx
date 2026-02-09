@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { api } from '../api';
 
 export default function Login() {
@@ -8,6 +8,16 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Check if this is a password recovery redirect
+  useEffect(() => {
+    const hash = location.hash;
+    if (hash.includes('type=recovery') || hash.includes('access_token')) {
+      // Redirect to reset password page with the hash
+      navigate('/reset-password' + hash);
+    }
+  }, [location, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

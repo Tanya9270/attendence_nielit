@@ -17,8 +17,17 @@ export default function ResetPassword() {
   useEffect(() => {
     // Check if we have a valid token in the URL
     const hash = location.hash;
-    if (!hash.includes('type=recovery')) {
+    if (!hash.includes('type=recovery') && !hash.includes('access_token')) {
       setError('Invalid or expired reset link. Please request a new password reset.');
+    } else {
+      // Initialize Supabase session from hash
+      const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+      // Supabase will automatically handle the hash parameters
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session) {
+          setError('Invalid or expired reset link. Please request a new password reset.');
+        }
+      });
     }
   }, [location]);
 
