@@ -486,10 +486,16 @@ export const api = {
 
   // ── Password Reset ────────────────────────────────────────
   async forgotPassword(email) {
+    const redirectUrl = `${window.location.origin}/reset-password`;
     const { error } = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
-      body: JSON.stringify({ email })
+      body: JSON.stringify({
+        email,
+        options: {
+          redirectTo: redirectUrl
+        }
+      })
     }).then(r => r.json());
     return { ok: !error, error: error?.message };
   },
