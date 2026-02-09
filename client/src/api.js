@@ -129,173 +129,260 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 8;
-  let yPosition = 10;
+  let yPosition = 8;
 
-  // === HEADER ===
-  doc.setFontSize(12);
+  // === NIELIT HEADER ===
+  doc.setFontSize(16);
   doc.setFont(undefined, 'bold');
   doc.setTextColor(0, 102, 179);
-  doc.text('NIELIT - National Institute of Electronics & Information Technology', pageWidth / 2, yPosition, { align: 'center' });
+  doc.text('NIELIT', pageWidth / 2, yPosition, { align: 'center' });
   yPosition += 5;
 
-  doc.setFontSize(11);
-  doc.text(title, pageWidth / 2, yPosition, { align: 'center' });
+  doc.setFontSize(9);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(100, 100, 100);
+  doc.text('National Institute of Electronics & Information Technology', pageWidth / 2, yPosition, { align: 'center' });
+  yPosition += 5;
+
+  // Blue separator line
+  doc.setDrawColor(0, 102, 179);
+  doc.setLineWidth(0.8);
+  doc.line(margin, yPosition, pageWidth - margin, yPosition);
   yPosition += 6;
 
-  // === COURSE INFO ===
-  doc.setFontSize(8);
-  doc.setFont(undefined, 'normal');
-  doc.setTextColor(50, 50, 50);
-  const infoColWidth = (pageWidth - 2 * margin) / 3;
+  // === TITLE ===
+  doc.setFontSize(13);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text('Monthly Attendance Report', pageWidth / 2, yPosition, { align: 'center' });
+  yPosition += 7;
 
-  doc.text(`Course Code: ${courseCode}`, margin, yPosition);
-  doc.text(`Month: ${monthName}`, margin + infoColWidth, yPosition);
-  doc.text(`Year: ${year}`, margin + infoColWidth * 2, yPosition);
+  // === COURSE INFORMATION (CENTERED) ===
+  doc.setFontSize(9);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(0, 102, 179);
+  doc.text(`Course Code: ${courseCode}`, pageWidth / 2, yPosition, { align: 'center' });
   yPosition += 4;
 
-  doc.text(`Course Name: ${courseName}`, margin, yPosition);
-  doc.text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, margin + infoColWidth, yPosition);
-  doc.text(`Total Students: ${students.length}`, margin + infoColWidth * 2, yPosition);
-  yPosition += 8;
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(50, 50, 50);
+  doc.text(courseName, pageWidth / 2, yPosition, { align: 'center' });
+  yPosition += 4;
 
-  // === CALENDAR GRID ===
-  // Determine last day of month
+  doc.text(`Faculty: [Faculty Name]`, pageWidth / 2, yPosition, { align: 'center' });
+  yPosition += 5;
+
   const monthMap = { 'January': 1, 'February': 2, 'March': 3, 'April': 4, 'May': 5, 'June': 6,
                      'July': 7, 'August': 8, 'September': 9, 'October': 10, 'November': 11, 'December': 12 };
   const monthNum = monthMap[monthName] || 1;
   const lastDay = new Date(year, monthNum, 0).getDate();
 
-  // Calculate cell dimensions
-  const dayWidth = (pageWidth - 2 * margin - 50) / lastDay; // 50 for student name column
+  // Count session days
+  const sessionDays = students.length > 0 ? Object.keys(attendanceData[students[0].student_id] || {}).length : 0;
+
+  doc.setFontSize(8);
+  doc.text(
+    `Month: ${monthName} ${year} | Session Days: ${sessionDays}`,
+    pageWidth / 2,
+    yPosition,
+    { align: 'center' }
+  );
+  yPosition += 4;
+
+  doc.text(
+    `Total Students: ${students.length} | Overall Attendance: [Calc]%`,
+    pageWidth / 2,
+    yPosition,
+    { align: 'center' }
+  );
+  yPosition += 7;
+
+  // === CALENDAR TABLE ===
+  const dayWidth = (pageWidth - 2 * margin - 50) / (lastDay + 1); // +1 for P column
   const cellHeight = 4;
+  let xPos = margin;
 
-  // === CALENDAR HEADER ROW ===
-  doc.setFillColor(0, 102, 179);
-  doc.setTextColor(255, 255, 255);
-  doc.setFont(undefined, 'bold');
-  doc.setFontSize(6);
-
-  // Student name header
+  // "Student" label header
+  doc.setFillColor(150, 150, 150);
   doc.rect(margin, yPosition - cellHeight + 0.5, 50, cellHeight, 'F');
+  doc.setDrawColor(100, 100, 100);
+  doc.rect(margin, yPosition - cellHeight + 0.5, 50, cellHeight);
+  doc.setFontSize(6);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(255, 255, 255);
   doc.text('Student', margin + 2, yPosition - 1);
 
-  // Day numbers
-  let xPos = margin + 50;
+  // Day numbers header
+  xPos = margin + 50;
   for (let day = 1; day <= lastDay; day++) {
+    // Check if this is a session day (at least one student has attendance for this day)
+    const isSessionDay = students.some(s => attendanceData[s.student_id]?.[day.toString().padStart(2, '0')]);
+
+    if (isSessionDay) {
+      doc.setFillColor(100, 180, 100); // Green for session days
+    } else {
+      doc.setFillColor(200, 200, 200); // Gray for non-session days
+    }
+
     doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight, 'F');
+    doc.setDrawColor(100, 100, 100);
+    doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight);
+
+    doc.setFontSize(5);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(0, 0, 0);
     doc.text(day.toString(), xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
+
     xPos += dayWidth;
   }
+
+  // P column header (Present count)
+  doc.setFillColor(150, 150, 150);
+  doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight, 'F');
+  doc.setDrawColor(100, 100, 100);
+  doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight);
+  doc.setFontSize(6);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(255, 255, 255);
+  doc.text('P', xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
 
   yPosition += cellHeight;
 
   // === STUDENT ROWS ===
-  doc.setTextColor(50, 50, 50);
-  doc.setFont(undefined, 'normal');
-  doc.setFontSize(6);
-
   students.forEach((student, idx) => {
-    // Check if we need a new page
     if (yPosition > pageHeight - 15) {
       doc.addPage('landscape');
       yPosition = margin;
 
       // Redraw header on new page
-      doc.setFillColor(0, 102, 179);
-      doc.setTextColor(255, 255, 255);
-      doc.setFont(undefined, 'bold');
-      doc.setFontSize(6);
-
+      xPos = margin;
+      doc.setFillColor(150, 150, 150);
       doc.rect(margin, yPosition - cellHeight + 0.5, 50, cellHeight, 'F');
+      doc.setDrawColor(100, 100, 100);
+      doc.rect(margin, yPosition - cellHeight + 0.5, 50, cellHeight);
+      doc.setFontSize(6);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(255, 255, 255);
       doc.text('Student', margin + 2, yPosition - 1);
 
       xPos = margin + 50;
       for (let day = 1; day <= lastDay; day++) {
+        const isSessionDay = students.some(s => attendanceData[s.student_id]?.[day.toString().padStart(2, '0')]);
+        if (isSessionDay) {
+          doc.setFillColor(100, 180, 100);
+        } else {
+          doc.setFillColor(200, 200, 200);
+        }
         doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight, 'F');
+        doc.setDrawColor(100, 100, 100);
+        doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight);
+        doc.setFontSize(5);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0);
         doc.text(day.toString(), xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
         xPos += dayWidth;
       }
 
+      doc.setFillColor(150, 150, 150);
+      doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight, 'F');
+      doc.setDrawColor(100, 100, 100);
+      doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight);
+      doc.setFontSize(6);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(255, 255, 255);
+      doc.text('P', xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
+
       yPosition += cellHeight;
-      doc.setTextColor(50, 50, 50);
-      doc.setFont(undefined, 'normal');
     }
 
     // Student name cell
-    const bgColor = idx % 2 === 0 ? [240, 240, 240] : [255, 255, 255];
-    doc.setFillColor(...bgColor);
+    doc.setFillColor(255, 255, 255);
     doc.rect(margin, yPosition - cellHeight + 0.5, 50, cellHeight, 'F');
-    doc.setDrawColor(200, 200, 200);
+    doc.setDrawColor(150, 150, 150);
     doc.rect(margin, yPosition - cellHeight + 0.5, 50, cellHeight);
 
-    const studentLabel = student.roll_number || student.name;
+    doc.setFontSize(6);
+    doc.setFont(undefined, 'normal');
     doc.setTextColor(0, 0, 0);
-    doc.setFont(undefined, 'bold');
-    doc.text(studentLabel.substring(0, 10), margin + 2, yPosition - 1);
+    doc.text(student.roll_number || student.id, margin + 1, yPosition - 2);
+    doc.text(student.name, margin + 1, yPosition + 1);
 
-    // Attendance cells for each day
+    // Attendance cells
     xPos = margin + 50;
+    let presentCount = 0;
+
     for (let day = 1; day <= lastDay; day++) {
-      doc.setFillColor(...bgColor);
+      doc.setFillColor(255, 255, 255);
       doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight, 'F');
-      doc.setDrawColor(200, 200, 200);
+      doc.setDrawColor(150, 150, 150);
       doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight);
 
-      // Get attendance status
       const dayStr = day.toString().padStart(2, '0');
       const attendanceStatus = attendanceData[student.student_id]?.[dayStr];
-      let cellSymbol = '-';
-      let symbolColor = [150, 150, 150];
+      let cellText = '-';
+      let textColor = [150, 150, 150];
 
       if (attendanceStatus === 'P') {
-        cellSymbol = '✓';
-        symbolColor = [45, 125, 50]; // Green
+        cellText = '✓';
+        textColor = [45, 125, 50]; // Green
+        presentCount++;
       } else if (attendanceStatus === 'A') {
-        cellSymbol = '✗';
-        symbolColor = [198, 40, 40]; // Red
+        cellText = '✗';
+        textColor = [198, 40, 40]; // Red
       } else if (attendanceStatus === 'L') {
-        cellSymbol = 'L';
-        symbolColor = [230, 81, 0]; // Orange
+        cellText = 'L';
+        textColor = [230, 81, 0]; // Orange
       }
 
-      doc.setTextColor(...symbolColor);
+      doc.setTextColor(...textColor);
       doc.setFont(undefined, 'bold');
-      doc.setFontSize(7);
-      doc.text(cellSymbol, xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
+      doc.setFontSize(6);
+      doc.text(cellText, xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
 
       xPos += dayWidth;
     }
+
+    // Present count column
+    doc.setFillColor(255, 255, 255);
+    doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight, 'F');
+    doc.setDrawColor(150, 150, 150);
+    doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight);
+
+    doc.setTextColor(0, 102, 179);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(6);
+    doc.text(presentCount.toString(), xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
 
     yPosition += cellHeight;
   });
 
   // === LEGEND ===
   yPosition += 2;
-  doc.setFontSize(7);
-  doc.setFont(undefined, 'bold');
-  doc.setTextColor(0, 102, 179);
-  doc.text('Legend:', margin, yPosition);
-
+  doc.setFontSize(6);
   doc.setFont(undefined, 'normal');
   doc.setTextColor(50, 50, 50);
-  const legendItems = [
-    { text: 'P = Present', color: [45, 125, 50] },
-    { text: 'A = Absent', color: [198, 40, 40] },
-    { text: 'L = Leave', color: [230, 81, 0] },
-    { text: '- = No Session', color: [150, 150, 150] }
-  ];
+  doc.text(
+    "Legend: ✓ Present (with scan time) | ✗ Absent | L Leave | W Weekend | H Holiday | - No Session",
+    margin,
+    yPosition
+  );
+  yPosition += 3;
 
-  let legendX = margin + 20;
-  legendItems.forEach((item) => {
-    doc.setTextColor(...item.color);
-    doc.text(item.text, legendX, yPosition);
-    legendX += 30;
-  });
+  doc.setFontSize(5);
+  doc.text(
+    "Note: Session Days = Days when attendance was conducted. Green column headers indicate session days.",
+    margin,
+    yPosition
+  );
 
-  // Add footer
+  // === FOOTER ===
   doc.setFontSize(6);
   doc.setTextColor(150, 150, 150);
-  doc.text(`Generated on ${new Date().toLocaleString('en-IN')}`, pageWidth / 2, pageHeight - 3, { align: 'center' });
+  doc.text(
+    `Generated on: ${new Date().toLocaleString('en-IN')}`,
+    margin,
+    pageHeight - 3
+  );
 
   return new Blob([doc.output('arraybuffer')], { type: 'application/pdf' });
 }
