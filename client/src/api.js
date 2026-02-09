@@ -212,7 +212,7 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
   doc.setTextColor(255, 255, 255);
   doc.text('Student', margin + 2, yPosition - 1);
 
-  // Day numbers header
+  // Day numbers header - always show 1-31, no OFF here
   xPos = margin + 50;
   for (let day = 1; day <= lastDay; day++) {
     // Check if this is a session day (at least one student has attendance for this day)
@@ -239,9 +239,8 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
     doc.setFont(undefined, 'bold');
     doc.setTextColor(0, 0, 0);
 
-    // Show day number or OFF for weekends
-    const dayText = isWeekend ? 'OFF' : day.toString();
-    doc.text(dayText, xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
+    // Always show day number
+    doc.text(day.toString(), xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
 
     xPos += dayWidth;
   }
@@ -298,9 +297,8 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
         doc.setFont(undefined, 'bold');
         doc.setTextColor(0, 0, 0);
 
-        // Show day number or OFF for weekends
-        const dayText = isWeekend ? 'OFF' : day.toString();
-        doc.text(dayText, xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
+        // Always show day number
+        doc.text(day.toString(), xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
         xPos += dayWidth;
       }
 
@@ -337,12 +335,20 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
       doc.setDrawColor(150, 150, 150);
       doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight);
 
+      // Check if weekend
+      const dateObj = new Date(year, monthNum - 1, day);
+      const dayOfWeek = dateObj.getDay();
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
       const dayStr = day.toString().padStart(2, '0');
       const attendanceStatus = attendanceData[student.student_id]?.[dayStr];
       let cellText = '-';
       let textColor = [150, 150, 150];
 
-      if (attendanceStatus === 'P') {
+      if (isWeekend) {
+        cellText = 'OFF';
+        textColor = [150, 150, 150];
+      } else if (attendanceStatus === 'P') {
         cellText = '✓';
         textColor = [45, 125, 50]; // Green
         presentCount++;

@@ -337,7 +337,7 @@ export default function StudentPortal() {
       doc.setTextColor(0, 0, 0);
       doc.text('Student', margin + 2, yPosition - 1);
 
-      // Day numbers header
+      // Day numbers header - always show 1-31
       xPos = margin + 50;
       for (let day = 1; day <= lastDay; day++) {
         const isSessionDay = attendanceMap[day] ? true : false;
@@ -363,9 +363,8 @@ export default function StudentPortal() {
         doc.setFont(undefined, 'bold');
         doc.setTextColor(0, 0, 0);
 
-        // Show day number or OFF for weekends
-        const dayText = isWeekend ? 'OFF' : day.toString();
-        doc.text(dayText, xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
+        // Always show day number
+        doc.text(day.toString(), xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
 
         xPos += dayWidth;
       }
@@ -402,11 +401,19 @@ export default function StudentPortal() {
         doc.setDrawColor(150, 150, 150);
         doc.rect(xPos, yPosition - cellHeight + 1, dayWidth, cellHeight);
 
+        // Check if weekend
+        const dateObj = new Date(selectedYear, parseInt(selectedMonth) - 1, day);
+        const dayOfWeek = dateObj.getDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
         const dayData = attendanceMap[day];
         let cellText = '-';
         let textColor = [150, 150, 150];
 
-        if (dayData) {
+        if (isWeekend) {
+          cellText = 'OFF';
+          textColor = [150, 150, 150];
+        } else if (dayData) {
           if (dayData.status === 'P') {
             cellText = '✓';
             textColor = [45, 125, 50]; // Green
