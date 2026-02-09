@@ -2,9 +2,16 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const MARK_FN_KEY = import.meta.env.VITE_MARK_FN_API_KEY;
 
-// Import jsPDF and autoTable at module level
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+// Lazy load jsPDF to ensure proper plugin initialization
+let jsPDFClass = null;
+
+async function loadJsPDF() {
+  if (jsPDFClass) return jsPDFClass;
+  const module = await import('jspdf');
+  jsPDFClass = module.jsPDF;
+  await import('jspdf-autotable');
+  return jsPDFClass;
+}
 
 const headers = (token) => ({
   'Content-Type': 'application/json',
@@ -52,6 +59,7 @@ function generateCSV(headersRow, rows) {
 
 // Helper: generate PDF blob from table data
 async function generatePDF(title, headersRow, rows) {
+  const jsPDF = await loadJsPDF();
   const doc = new jsPDF();
 
   // Add title

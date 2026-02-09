@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
 import { api } from '../api';
 import Navigation from './Navigation';
 
@@ -242,6 +240,8 @@ export default function StudentPortal() {
   const downloadMyPDF = async () => {
     if (!attendanceStats || !attendanceStats.recentAttendance) return;
     try {
+      const { jsPDF } = await import('jspdf');
+      await import('jspdf-autotable');
       const doc = new jsPDF();
 
       // Add title
