@@ -286,9 +286,9 @@ export default function StudentPortal() {
       doc.setFont(undefined, 'normal');
       doc.setTextColor(50, 50, 50);
       doc.text(`${student.course_name || 'Course'}`, pageWidth / 2, yPosition, { align: 'center' });
-      yPosition += 4;
+      yPosition += 3;
 
-      doc.text(`Faculty: ${student.faculty || 'Not Assigned'}`, pageWidth / 2, yPosition, { align: 'center' });
+      doc.text(`Faculty: ${student.faculty || '[Faculty Name]'}`, pageWidth / 2, yPosition, { align: 'center' });
       yPosition += 5;
 
       const monthLabel = selectedMonth ? months.find(m => m.value === selectedMonth)?.label || selectedMonth : 'Overall';
@@ -390,9 +390,7 @@ export default function StudentPortal() {
       doc.setFontSize(7);
       doc.setFont(undefined, 'normal');
       doc.setTextColor(0, 0, 0);
-      const studentLabel = `${student.roll_number}\n${student.name}`;
-      doc.text(student.roll_number, margin + 2, yPosition - 3);
-      doc.text(student.name, margin + 2, yPosition + 1);
+      doc.text(`${student.roll_number} ${student.name}`, margin + 2, yPosition - 1);
 
       // Attendance cells
       xPos = margin + 50;

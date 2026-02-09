@@ -167,7 +167,7 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
   doc.setFont(undefined, 'normal');
   doc.setTextColor(50, 50, 50);
   doc.text(courseName, pageWidth / 2, yPosition, { align: 'center' });
-  yPosition += 4;
+  yPosition += 3;
 
   doc.text(`Faculty: [Faculty Name]`, pageWidth / 2, yPosition, { align: 'center' });
   yPosition += 5;
@@ -325,8 +325,7 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
     doc.setFontSize(6);
     doc.setFont(undefined, 'normal');
     doc.setTextColor(0, 0, 0);
-    doc.text(student.roll_number || student.id, margin + 1, yPosition - 2);
-    doc.text(student.name, margin + 1, yPosition + 1);
+    doc.text(`${student.roll_number || student.id} ${student.name}`, margin + 1, yPosition - 1);
 
     // Attendance cells
     xPos = margin + 50;
