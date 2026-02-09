@@ -122,6 +122,142 @@ async function generatePDF(title, headersRow, rows) {
   return new Blob([doc.output('arraybuffer')], { type: 'application/pdf' });
 }
 
+// Helper: generate calendar-style PDF for monthly class attendance
+async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthName, year, students, attendanceData) {
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF('landscape');
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 8;
+  let yPosition = 10;
+
+  // === HEADER ===
+  doc.setFontSize(12);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(0, 102, 179);
+  doc.text('NIELIT - National Institute of Electronics & Information Technology', pageWidth / 2, yPosition, { align: 'center' });
+  yPosition += 5;
+
+  doc.setFontSize(11);
+  doc.text(title, pageWidth / 2, yPosition, { align: 'center' });
+  yPosition += 6;
+
+  // === COURSE INFO ===
+  doc.setFontSize(8);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(50, 50, 50);
+  const infoColWidth = (pageWidth - 2 * margin) / 3;
+
+  doc.text(`Course Code: ${courseCode}`, margin, yPosition);
+  doc.text(`Month: ${monthName}`, margin + infoColWidth, yPosition);
+  doc.text(`Year: ${year}`, margin + infoColWidth * 2, yPosition);
+  yPosition += 4;
+
+  doc.text(`Course Name: ${courseName}`, margin, yPosition);
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, margin + infoColWidth, yPosition);
+  doc.text(`Total Students: ${students.length}`, margin + infoColWidth * 2, yPosition);
+  yPosition += 8;
+
+  // === CALENDAR HEADER ===
+  doc.setFillColor(0, 102, 179);
+  doc.setTextColor(255, 255, 255);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(7);
+
+  const monthDate = new Date(year, parseInt(monthName.split('-')[1]) - 1 || 0, 1);
+  const lastDay = new Date(year, parseInt(monthName.split('-')[1]) || 11, 0).getDate();
+
+  // Detect month number from monthName if it contains "-"
+  let monthNum = 0;
+  if (monthName && typeof monthName === 'string') {
+    const monthMap = { 'January': 1, 'February': 2, 'March': 3, 'April': 4, 'May': 5, 'June': 6,
+                       'July': 7, 'August': 8, 'September': 9, 'October': 10, 'November': 11, 'December': 12 };
+    monthNum = monthMap[monthName] || 0;
+  }
+  const actualLastDay = monthNum ? new Date(year, monthNum, 0).getDate() : 31;
+
+  const dayWidth = (pageWidth - 2 * margin - 40) / actualLastDay;
+  const cellHeight = 5;
+  let xPos = margin + 40; // Space for student names
+
+  // Empty cell for name space
+  doc.rect(margin, yPosition - cellHeight + 0.5, 40, cellHeight, 'F');
+  doc.setFontSize(6);
+  doc.text('Student', margin + 2, yPosition - 1);
+
+  // Day numbers (1-31)
+  for (let day = 1; day <= actualLastDay; day++) {
+    doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight, 'F');
+    doc.setFontSize(6);
+    doc.text(String(day), xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
+    xPos += dayWidth;
+  }
+
+  yPosition += cellHeight;
+
+  // === STUDENT ROWS ===
+  doc.setTextColor(50, 50, 50);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(6);
+
+  students.forEach((student, idx) => {
+    if (yPosition > pageHeight - 10) {
+      doc.addPage('landscape');
+      yPosition = margin;
+    }
+
+    // Student name box
+    const bgColor = idx % 2 === 0 ? [240, 240, 240] : [255, 255, 255];
+    doc.setFillColor(...bgColor);
+    doc.rect(margin, yPosition - cellHeight + 0.5, 40, cellHeight, 'F');
+    doc.setDrawColor(200, 200, 200);
+    doc.rect(margin, yPosition - cellHeight + 0.5, 40, cellHeight);
+
+    const nameText = student.roll_number || student.name;
+    doc.text(nameText.substring(0, 12), margin + 2, yPosition - 1);
+
+    // Attendance cells for each day
+    xPos = margin + 40;
+    for (let day = 1; day <= actualLastDay; day++) {
+      doc.setFillColor(...bgColor);
+      doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight, 'F');
+      doc.setDrawColor(200, 200, 200);
+      doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight);
+
+      // Look up attendance status for this student and day
+      const dateStr = `${day.toString().padStart(2, '0')}-${monthNum.toString().padStart(2, '0')}-${year}`;
+      const studentAttendance = attendanceData[student.id]?.[dateStr];
+      if (studentAttendance) {
+        doc.setTextColor(0, 102, 179);
+        doc.text(studentAttendance, xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
+        doc.setTextColor(50, 50, 50);
+      }
+
+      xPos += dayWidth;
+    }
+
+    yPosition += cellHeight;
+  });
+
+  // === LEGEND ===
+  yPosition += 3;
+  doc.setFontSize(7);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(0, 102, 179);
+  doc.text('Legend:', margin, yPosition);
+
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(50, 50, 50);
+  doc.text('P = Present  |  A = Absent  |  L = Leave  |  H = Holiday  |  W = Weekend', margin + 15, yPosition);
+
+  // Add footer
+  doc.setFontSize(6);
+  doc.setTextColor(150, 150, 150);
+  doc.text(`Generated on ${new Date().toLocaleString('en-IN')}`, pageWidth / 2, pageHeight - 3, { align: 'center' });
+
+  return new Blob([doc.output('arraybuffer')], { type: 'application/pdf' });
+}
+
 export const api = {
   // ── Auth ──────────────────────────────────────────────────
   async login(email, password) {
@@ -277,18 +413,36 @@ export const api = {
     if (!data.ok) throw new Error('Failed to load monthly data');
 
     const students = data.students || [];
-    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
-    const rows = students.map((s, i) => [
-      i + 1,
-      s.roll_number,
-      s.name,
-      s.present,
-      s.absent,
-      s.percentage + '%'
-    ]);
-    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
-    const title = `Monthly Attendance Report - ${monthName}`;
-    return await generatePDF(title, hdrs, rows);
+    const courseName = data.course_name || courseCode;
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD-MM-YYYY: 'P'/'A'/'L'}}
+    const attendanceMap = {};
+    students.forEach(student => {
+      attendanceMap[student.student_id] = {};
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData, dayIdx) => {
+          if (dayData.status === 'present') {
+            attendanceMap[student.student_id][dayData.day] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[student.student_id][dayData.day] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[student.student_id][dayData.day] = 'L';
+          }
+        });
+      }
+    });
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    return await generateMonthlyCalendarPDF(
+      title,
+      courseCode,
+      courseName,
+      monthName,
+      year,
+      students,
+      attendanceMap
+    );
   },
 
   // ── Export: Monthly CSV ───────────────────────────────────

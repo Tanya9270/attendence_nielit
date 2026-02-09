@@ -241,110 +241,200 @@ export default function StudentPortal() {
     if (!attendanceStats || !attendanceStats.recentAttendance) return;
     try {
       const { jsPDF } = await import('jspdf');
-      const doc = new jsPDF();
+      const doc = new jsPDF('landscape');
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 14;
-      const lineHeight = 7;
-      let yPosition = 15;
+      const margin = 10;
+      let yPosition = 10;
 
-      // Add title
-      doc.setFontSize(16);
+      // === HEADER SECTION ===
+      doc.setFontSize(14);
       doc.setFont(undefined, 'bold');
-      doc.text('My Attendance Report', margin, yPosition);
-      yPosition += 10;
+      doc.setTextColor(0, 102, 179);
+      doc.text('NIELIT - National Institute of Electronics & Information Technology', pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 7;
 
-      // Add student info
-      doc.setFontSize(11);
-      doc.setFont(undefined, 'normal');
-      doc.text(`Student: ${student.name}`, margin, yPosition);
-      yPosition += 6;
-      doc.text(`Roll Number: ${student.roll_number}`, margin, yPosition);
-      yPosition += 6;
-      doc.text(`Course: ${student.course_code}`, margin, yPosition);
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(50, 50, 50);
+      doc.text('Student Attendance Report', pageWidth / 2, yPosition, { align: 'center' });
       yPosition += 8;
 
-      // Add timestamp and period
-      doc.setFontSize(10);
-      const monthLabel = selectedMonth ? months.find(m => m.value === selectedMonth)?.label || selectedMonth : 'Overall';
-      doc.text(`Period: ${monthLabel} ${selectedYear}`, margin, yPosition);
-      yPosition += 6;
-      doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, margin, yPosition);
-      yPosition += 10;
+      // === STUDENT INFO SECTION ===
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(50, 50, 50);
 
-      // Table setup
-      const headers = ['Date', 'Day', 'Status', 'Time'];
-      const colCount = headers.length;
-      const usableWidth = pageWidth - 2 * margin;
-      const colWidth = usableWidth / colCount;
+      const infoBoxY = yPosition;
+      const colWidth = (pageWidth - 2 * margin) / 3;
 
-      // Draw table headers
+      doc.text(`Name: ${student.name}`, margin, yPosition);
+      doc.text(`Month: ${attendanceStats.monthName}`, margin + colWidth, yPosition);
+      doc.text(`Year: ${selectedYear}`, margin + colWidth * 2, yPosition);
+      yPosition += 5;
+
+      doc.text(`Roll Number: ${student.roll_number}`, margin, yPosition);
+      doc.text(`Course: ${student.course_code}`, margin + colWidth, yPosition);
+      doc.text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, margin + colWidth * 2, yPosition);
+      yPosition += 8;
+
+      // === CALENDAR GRID ===
+      const startDate = new Date(selectedYear, selectedMonth ? parseInt(selectedMonth) - 1 : 0, 1);
+      const lastDay = selectedMonth ? new Date(selectedYear, parseInt(selectedMonth), 0).getDate() : 31;
+
+      // Create a map of attendance data by date
+      const attendanceMap = {};
+      attendanceStats.recentAttendance.forEach(record => {
+        const dateKey = new Date(record.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        attendanceMap[dateKey] = record.status.charAt(0).toUpperCase(); // P, A, L
+      });
+
+      // Draw calendar header
       doc.setFillColor(0, 102, 179);
       doc.setTextColor(255, 255, 255);
       doc.setFont(undefined, 'bold');
-      doc.setFontSize(9);
+      doc.setFontSize(8);
 
+      const dayWidth = (pageWidth - 2 * margin) / 32; // 31 days + 1 for row labels
+      const cellHeight = 6;
       let xPos = margin;
-      headers.forEach((header) => {
-        doc.text(header, xPos + 2, yPosition + 4, { maxWidth: colWidth - 4, align: 'left' });
-        xPos += colWidth;
+
+      // Empty cell for label space
+      xPos += dayWidth;
+
+      // Day numbers (1-31)
+      for (let day = 1; day <= lastDay; day++) {
+        doc.rect(xPos, yPosition - cellHeight + 1, dayWidth, cellHeight, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.text(String(day), xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
+        xPos += dayWidth;
+      }
+
+      yPosition += cellHeight + 1;
+
+      // === LEGEND & STATISTICS ===
+      // Draw legend next to calendar
+      const legendX = margin + dayWidth * (lastDay + 1) + 5;
+      const legendY = yPosition - cellHeight + 1;
+
+      doc.setFontSize(7);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(0, 102, 179);
+      doc.text('Legend:', legendX, legendY);
+
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(50, 50, 50);
+      doc.text('✓ = Present', legendX, legendY + 4);
+      doc.text('✗ = Absent', legendX, legendY + 7);
+      doc.text('L = Leave', legendX, legendY + 10);
+      doc.text('H = Holiday', legendX, legendY + 13);
+      doc.text('W = Weekend', legendX, legendY + 16);
+
+      // === DISPLAY SUMMARY STATS ===
+      yPosition += 22;
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(0, 102, 179);
+      doc.text('Attendance Summary', margin, yPosition);
+      yPosition += 6;
+
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(50, 50, 50);
+      const statsBox = [
+        `Days Present: ${attendanceStats.stats.presentDays}`,
+        `Days Absent: ${attendanceStats.stats.absentDays}`,
+        `Leave Days: ${attendanceStats.stats.leaveDays}`,
+        `Total Working Days: ${attendanceStats.stats.totalWorkingDays}`,
+        `Attendance %: ${attendanceStats.stats.percentage}%`
+      ];
+
+      statsBox.forEach((stat, idx) => {
+        doc.text(stat, margin, yPosition + (idx * 4));
       });
-      yPosition += lineHeight + 2;
 
-      // Draw table rows
-      const rows = attendanceStats.recentAttendance.map(record => [
-        new Date(record.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-        new Date(record.date).toLocaleDateString('en-IN', { weekday: 'short' }),
-        record.status,
-        record.scan_time
-          ? new Date(record.scan_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
-          : '-'
-      ]);
+      // === DETAILED ATTENDANCE TABLE ===
+      // Check if we need to add a new page for the detailed list
+      yPosition += statsBox.length * 4 + 8;
+      if (yPosition > pageHeight - 30) {
+        doc.addPage('landscape');
+        yPosition = 15;
+      }
 
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(0, 102, 179);
+      doc.text('Detailed Attendance Records', margin, yPosition);
+      yPosition += 7;
+
+      // Table headers
+      doc.setFillColor(0, 102, 179);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(8);
+
+      const tableColWidth = (pageWidth - 2 * margin) / 4;
+      const tableRowHeight = 5;
+      xPos = margin;
+
+      const tableHeaders = ['Date', 'Day', 'Status', 'Time (IST)'];
+      tableHeaders.forEach((header) => {
+        doc.rect(xPos, yPosition - tableRowHeight + 1, tableColWidth, tableRowHeight, 'F');
+        doc.text(header, xPos + 2, yPosition - 1);
+        xPos += tableColWidth;
+      });
+      yPosition += tableRowHeight + 1;
+
+      // Table rows
       doc.setTextColor(50, 50, 50);
       doc.setFont(undefined, 'normal');
+      doc.setFontSize(7);
       let bgColor = false;
 
-      rows.forEach((row) => {
-        if (yPosition > pageHeight - 25) {
-          doc.addPage();
+      attendanceStats.recentAttendance.forEach((record) => {
+        if (yPosition > pageHeight - 10) {
+          doc.addPage('landscape');
           yPosition = margin;
         }
 
+        // Alternating row colors
         if (bgColor) {
-          doc.setFillColor(245, 245, 245);
+          doc.setFillColor(240, 240, 240);
         } else {
           doc.setFillColor(255, 255, 255);
         }
-        doc.rect(margin, yPosition - 3, usableWidth, lineHeight + 2, 'F');
+        doc.rect(margin, yPosition - tableRowHeight + 1, pageWidth - 2 * margin, tableRowHeight, 'F');
         bgColor = !bgColor;
 
+        // Draw border
         doc.setDrawColor(200, 200, 200);
-        doc.rect(margin, yPosition - 3, usableWidth, lineHeight + 2);
+        doc.rect(margin, yPosition - tableRowHeight + 1, pageWidth - 2 * margin, tableRowHeight);
 
-        xPos = margin;
-        row.forEach((cell) => {
-          doc.text(String(cell), xPos + 2, yPosition + 2, { maxWidth: colWidth - 4, align: 'left' });
-          xPos += colWidth;
+        xPos = margin + 1;
+        const cells = [
+          new Date(record.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+          new Date(record.date).toLocaleDateString('en-IN', { weekday: 'short' }),
+          record.status,
+          record.scan_time
+            ? new Date(record.scan_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+            : '-'
+        ];
+
+        cells.forEach((cell) => {
+          doc.text(String(cell), xPos, yPosition - 1);
+          xPos += tableColWidth;
         });
-        yPosition += lineHeight + 2;
+
+        yPosition += tableRowHeight + 1;
       });
 
-      // Add statistics at bottom
-      yPosition += 5;
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'bold');
-      doc.text(`Statistics:`, margin, yPosition);
-      yPosition += 6;
-      doc.setFont(undefined, 'normal');
-      doc.text(`Days Present: ${attendanceStats.stats.presentDays}`, margin, yPosition);
-      yPosition += 5;
-      doc.text(`Days Absent: ${attendanceStats.stats.absentDays}`, margin, yPosition);
-      yPosition += 5;
-      doc.text(`Attendance: ${attendanceStats.stats.percentage}%`, margin, yPosition);
+      // Add footer
+      doc.setFontSize(7);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Generated on ${new Date().toLocaleString('en-IN')} | Attendance Management System`, pageWidth / 2, pageHeight - 5, { align: 'center' });
 
-      const monthLabel2 = selectedMonth ? months.find(m => m.value === selectedMonth)?.label || selectedMonth : 'Overall';
-      doc.save(`my-attendance-${monthLabel2}-${selectedYear}.pdf`);
+      const monthLabel = selectedMonth ? months.find(m => m.value === selectedMonth)?.label || selectedMonth : 'Overall';
+      doc.save(`my-attendance-${monthLabel}-${selectedYear}.pdf`);
     } catch (err) {
       console.error('Failed to generate PDF:', err);
       alert('Failed to generate PDF');
