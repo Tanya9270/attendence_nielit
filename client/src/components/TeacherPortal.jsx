@@ -270,15 +270,15 @@ export default function TeacherPortal() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `attendance-${selectedCourse}-${date}.csv`);
+      link.setAttribute('download', `attendance-${selectedCourse}-${date}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      setMessage({ type: 'success', text: 'Daily CSV exported successfully' });
+      setMessage({ type: 'success', text: 'Daily PDF exported successfully' });
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (err) {
-      setMessage({ type: 'error', text: err.message || 'Failed to export CSV' });
+      setMessage({ type: 'error', text: err.message || 'Failed to export PDF' });
       console.error(err);
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } finally {
@@ -331,15 +331,15 @@ export default function TeacherPortal() {
       const link = document.createElement('a');
       link.href = url;
       const monthName = months.find(m => m.value === selectedMonth)?.label || selectedMonth;
-      link.setAttribute('download', `attendance-${selectedCourse}-${monthName}-${selectedYear}.csv`);
+      link.setAttribute('download', `attendance-${selectedCourse}-${monthName}-${selectedYear}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      setMessage({ type: 'success', text: 'Monthly CSV exported successfully' });
+      setMessage({ type: 'success', text: 'Monthly PDF exported successfully' });
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (err) {
-      setMessage({ type: 'error', text: err.message || 'Failed to export CSV' });
+      setMessage({ type: 'error', text: err.message || 'Failed to export PDF' });
       console.error(err);
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } finally {
@@ -684,6 +684,23 @@ export default function TeacherPortal() {
                       marginTop: '5px'
                     }}>
                       <button
+                        onClick={handleExportDailyPDF}
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          padding: '12px 15px',
+                          border: 'none',
+                          background: 'none',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          fontSize: '14px'
+                        }}
+                        onMouseOver={(e) => e.target.style.background = '#f5f5f5'}
+                        onMouseOut={(e) => e.target.style.background = 'none'}
+                      >
+                        📄 Export as PDF
+                      </button>
+                      <button
                         onClick={handleExportDailyCSV}
                         style={{
                           display: 'block',
@@ -904,6 +921,23 @@ export default function TeacherPortal() {
                       minWidth: '160px',
                       marginTop: '5px'
                     }}>
+                      <button
+                        onClick={handleExportMonthlyPDF}
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          padding: '12px 15px',
+                          border: 'none',
+                          background: 'none',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          fontSize: '14px'
+                        }}
+                        onMouseOver={(e) => e.target.style.background = '#f5f5f5'}
+                        onMouseOut={(e) => e.target.style.background = 'none'}
+                      >
+                        📄 Export as PDF
+                      </button>
                       <button
                         onClick={handleExportMonthlyCSV}
                         style={{

@@ -237,6 +237,74 @@ export default function StudentPortal() {
     URL.revokeObjectURL(url);
   };
 
+  const downloadMyPDF = async () => {
+    if (!attendanceStats || !attendanceStats.recentAttendance) return;
+    try {
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF();
+
+      // Add title
+      doc.setFontSize(16);
+      doc.text('My Attendance Report', 14, 15);
+
+      // Add student info
+      doc.setFontSize(11);
+      doc.text(`Student: ${student.name}`, 14, 25);
+      doc.text(`Roll Number: ${student.roll_number}`, 14, 32);
+      doc.text(`Course: ${student.course_code}`, 14, 39);
+
+      // Add timestamp
+      doc.setFontSize(10);
+      const monthLabel = selectedMonth ? months.find(m => m.value === selectedMonth)?.label || selectedMonth : 'Overall';
+      doc.text(`Period: ${monthLabel} ${selectedYear}`, 14, 46);
+      doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, 14, 52);
+
+      // Add table
+      const headers = ['Date', 'Day', 'Status', 'Scan Time'];
+      const rows = attendanceStats.recentAttendance.map(record => [
+        new Date(record.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        new Date(record.date).toLocaleDateString('en-IN', { weekday: 'short' }),
+        record.status,
+        record.scan_time
+          ? new Date(record.scan_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+          : '-'
+      ]);
+
+      doc.autoTable({
+        head: [headers],
+        body: rows,
+        startY: 60,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [0, 102, 179],
+          textColor: 255,
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        bodyStyles: {
+          textColor: 50,
+          halign: 'center'
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        }
+      });
+
+      // Add statistics
+      const finalY = doc.lastAutoTable.finalY + 15;
+      doc.setFontSize(11);
+      doc.text(`Total Days Present: ${attendanceStats.stats.presentDays}`, 14, finalY);
+      doc.text(`Total Days Absent: ${attendanceStats.stats.absentDays}`, 14, finalY + 7);
+      doc.text(`Attendance Percentage: ${attendanceStats.stats.percentage}%`, 14, finalY + 14);
+
+      const monthLabel2 = selectedMonth ? months.find(m => m.value === selectedMonth)?.label || selectedMonth : 'Overall';
+      doc.save(`my-attendance-${monthLabel2}-${selectedYear}.pdf`);
+    } catch (err) {
+      console.error('Failed to generate PDF:', err);
+      alert('Failed to generate PDF');
+    }
+  };
+
   if (!student) {
     return (
       <div className="container" style={{ paddingTop: '40px' }}>
@@ -511,14 +579,22 @@ export default function StudentPortal() {
                   </div>
 
                   {/* Export Button */}
-                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                  <div style={{ textAlign: 'center', marginBottom: '20px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                    <button
+                      onClick={downloadMyPDF}
+                      className="btn btn-secondary"
+                      disabled={!attendanceStats.recentAttendance || attendanceStats.recentAttendance.length === 0}
+                      style={{ fontSize: '14px' }}
+                    >
+                      📄 Download as PDF
+                    </button>
                     <button
                       onClick={downloadMyCSV}
                       className="btn btn-secondary"
                       disabled={!attendanceStats.recentAttendance || attendanceStats.recentAttendance.length === 0}
                       style={{ fontSize: '14px' }}
                     >
-                      📥 Download Attendance CSV
+                      📊 Download as CSV
                     </button>
                   </div>
 

@@ -46,6 +46,46 @@ function generateCSV(headersRow, rows) {
   return new Blob([lines.join('\n')], { type: 'text/csv' });
 }
 
+// Helper: generate PDF blob from table data
+async function generatePDF(title, headersRow, rows) {
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF();
+
+  // Add title
+  doc.setFontSize(16);
+  doc.text(title, 14, 15);
+
+  // Add timestamp
+  doc.setFontSize(10);
+  doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, 14, 22);
+
+  // Add table
+  const tableData = rows.map(row => row);
+
+  doc.autoTable({
+    head: [headersRow],
+    body: tableData,
+    startY: 30,
+    theme: 'grid',
+    headStyles: {
+      fillColor: [0, 102, 179],
+      textColor: 255,
+      fontStyle: 'bold',
+      halign: 'center'
+    },
+    bodyStyles: {
+      textColor: 50,
+      halign: 'center'
+    },
+    alternateRowStyles: {
+      fillColor: [245, 245, 245]
+    },
+    margin: { top: 30 }
+  });
+
+  return new Blob([doc.output('arraybuffer')], { type: 'application/pdf' });
+}
+
 export const api = {
   // ── Auth ──────────────────────────────────────────────────
   async login(email, password) {
@@ -173,7 +213,8 @@ export const api = {
       s.status,
       s.scan_time ? new Date(s.scan_time).toLocaleTimeString('en-IN') : '-'
     ]);
-    return generateCSV(hdrs, rows);
+    const title = `Daily Attendance Report - ${date}`;
+    return await generatePDF(title, hdrs, rows);
   },
 
   // ── Export: Daily CSV ─────────────────────────────────────
@@ -194,7 +235,7 @@ export const api = {
     return generateCSV(hdrs, rows);
   },
 
-  // ── Export: Monthly PDF (client-side CSV) ──────────────────
+  // ── Export: Monthly PDF (client-side generation) ───────────
   async exportMonthlyPDF(token, month, year, className, section, courseCode) {
     const data = await attApi(token, { action: 'get-monthly', month, year, course_code: courseCode });
     if (!data.ok) throw new Error('Failed to load monthly data');
@@ -209,7 +250,9 @@ export const api = {
       s.absent,
       s.percentage + '%'
     ]);
-    return generateCSV(hdrs, rows);
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+    const title = `Monthly Attendance Report - ${monthName}`;
+    return await generatePDF(title, hdrs, rows);
   },
 
   // ── Export: Monthly CSV ───────────────────────────────────
