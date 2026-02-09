@@ -18,14 +18,5 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['jspdf', 'jspdf-autotable']
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'jspdf-bundle': ['jspdf', 'jspdf-autotable']
-        }
-      }
-    }
   }
 })
