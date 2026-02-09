@@ -270,15 +270,15 @@ export default function TeacherPortal() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `attendance-${selectedCourse}-${date}.pdf`);
+      link.setAttribute('download', `attendance-${selectedCourse}-${date}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      setMessage({ type: 'success', text: 'Daily PDF exported successfully' });
+      setMessage({ type: 'success', text: 'Daily CSV exported successfully' });
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (err) {
-      setMessage({ type: 'error', text: err.message || 'Failed to export PDF' });
+      setMessage({ type: 'error', text: err.message || 'Failed to export CSV' });
       console.error(err);
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } finally {
@@ -331,15 +331,15 @@ export default function TeacherPortal() {
       const link = document.createElement('a');
       link.href = url;
       const monthName = months.find(m => m.value === selectedMonth)?.label || selectedMonth;
-      link.setAttribute('download', `attendance-${selectedCourse}-${monthName}-${selectedYear}.pdf`);
+      link.setAttribute('download', `attendance-${selectedCourse}-${monthName}-${selectedYear}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      setMessage({ type: 'success', text: 'Monthly PDF exported successfully' });
+      setMessage({ type: 'success', text: 'Monthly CSV exported successfully' });
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (err) {
-      setMessage({ type: 'error', text: err.message || 'Failed to export PDF' });
+      setMessage({ type: 'error', text: err.message || 'Failed to export CSV' });
       console.error(err);
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } finally {
@@ -683,7 +683,7 @@ export default function TeacherPortal() {
                       minWidth: '160px',
                       marginTop: '5px'
                     }}>
-                      <button 
+                      <button
                         onClick={handleExportDailyPDF}
                         style={{
                           display: 'block',
@@ -698,7 +698,7 @@ export default function TeacherPortal() {
                         onMouseOver={(e) => e.target.style.background = '#f5f5f5'}
                         onMouseOut={(e) => e.target.style.background = 'none'}
                       >
-                        📄 Export as PDF
+                        📊 Export as CSV
                       </button>
                       <button 
                         onClick={handleExportDailyCSV}
@@ -921,7 +921,7 @@ export default function TeacherPortal() {
                       minWidth: '160px',
                       marginTop: '5px'
                     }}>
-                      <button 
+                      <button
                         onClick={handleExportMonthlyPDF}
                         style={{
                           display: 'block',
@@ -936,7 +936,7 @@ export default function TeacherPortal() {
                         onMouseOver={(e) => e.target.style.background = '#f5f5f5'}
                         onMouseOut={(e) => e.target.style.background = 'none'}
                       >
-                        📄 Export as PDF
+                        📊 Export as CSV
                       </button>
                       <button 
                         onClick={handleExportMonthlyCSV}
