@@ -46,45 +46,77 @@ function generateCSV(headersRow, rows) {
   return new Blob([lines.join('\n')], { type: 'text/csv' });
 }
 
-// Helper: generate PDF blob from table data
+// Helper: generate PDF blob from table data (without autoTable plugin)
 async function generatePDF(title, headersRow, rows) {
-  // Import jsPDF and the plugin together to ensure proper initialization
   const { jsPDF } = await import('jspdf');
-  // Import the plugin as a side effect to extend jsPDF
-  await import('jspdf-autotable');
-
   const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 14;
+  const lineHeight = 7;
+  let yPosition = 15;
 
   // Add title
   doc.setFontSize(16);
-  doc.text(title, 14, 15);
+  doc.setFont(undefined, 'bold');
+  doc.text(title, margin, yPosition);
+  yPosition += 10;
 
   // Add timestamp
   doc.setFontSize(10);
-  doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, 14, 22);
+  doc.setFont(undefined, 'normal');
+  doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, margin, yPosition);
+  yPosition += 8;
 
-  // Add table
-  const tableData = rows.map(row => row);
+  // Calculate column widths
+  const colCount = headersRow.length;
+  const usableWidth = pageWidth - 2 * margin;
+  const colWidth = usableWidth / colCount;
 
-  doc.autoTable({
-    head: [headersRow],
-    body: tableData,
-    startY: 30,
-    theme: 'grid',
-    headStyles: {
-      fillColor: [0, 102, 179],
-      textColor: 255,
-      fontStyle: 'bold',
-      halign: 'center'
-    },
-    bodyStyles: {
-      textColor: 50,
-      halign: 'center'
-    },
-    alternateRowStyles: {
-      fillColor: [245, 245, 245]
-    },
-    margin: { top: 30 }
+  // Draw table headers
+  doc.setFillColor(0, 102, 179);
+  doc.setTextColor(255, 255, 255);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(9);
+
+  let xPos = margin;
+  headersRow.forEach((header) => {
+    doc.text(header, xPos + 2, yPosition + 4, { maxWidth: colWidth - 4, align: 'left' });
+    xPos += colWidth;
+  });
+  yPosition += lineHeight + 2;
+
+  // Draw table rows
+  doc.setTextColor(50, 50, 50);
+  doc.setFont(undefined, 'normal');
+  let bgColor = false;
+
+  rows.forEach((row) => {
+    // Check if we need a new page
+    if (yPosition > pageHeight - 20) {
+      doc.addPage();
+      yPosition = margin;
+    }
+
+    // Alternate row colors
+    if (bgColor) {
+      doc.setFillColor(245, 245, 245);
+    } else {
+      doc.setFillColor(255, 255, 255);
+    }
+    doc.rect(margin, yPosition - 3, usableWidth, lineHeight + 2, 'F');
+    bgColor = !bgColor;
+
+    // Draw grid
+    doc.setDrawColor(200, 200, 200);
+    doc.rect(margin, yPosition - 3, usableWidth, lineHeight + 2);
+
+    xPos = margin;
+    row.forEach((cell) => {
+      doc.text(String(cell), xPos + 2, yPosition + 2, { maxWidth: colWidth - 4, align: 'left' });
+      xPos += colWidth;
+    });
+    yPosition += lineHeight + 2;
   });
 
   return new Blob([doc.output('arraybuffer')], { type: 'application/pdf' });

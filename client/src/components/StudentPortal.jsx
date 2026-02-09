@@ -241,62 +241,107 @@ export default function StudentPortal() {
     if (!attendanceStats || !attendanceStats.recentAttendance) return;
     try {
       const { jsPDF } = await import('jspdf');
-      await import('jspdf-autotable');
       const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 14;
+      const lineHeight = 7;
+      let yPosition = 15;
 
       // Add title
       doc.setFontSize(16);
-      doc.text('My Attendance Report', 14, 15);
+      doc.setFont(undefined, 'bold');
+      doc.text('My Attendance Report', margin, yPosition);
+      yPosition += 10;
 
       // Add student info
       doc.setFontSize(11);
-      doc.text(`Student: ${student.name}`, 14, 25);
-      doc.text(`Roll Number: ${student.roll_number}`, 14, 32);
-      doc.text(`Course: ${student.course_code}`, 14, 39);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Student: ${student.name}`, margin, yPosition);
+      yPosition += 6;
+      doc.text(`Roll Number: ${student.roll_number}`, margin, yPosition);
+      yPosition += 6;
+      doc.text(`Course: ${student.course_code}`, margin, yPosition);
+      yPosition += 8;
 
-      // Add timestamp
+      // Add timestamp and period
       doc.setFontSize(10);
       const monthLabel = selectedMonth ? months.find(m => m.value === selectedMonth)?.label || selectedMonth : 'Overall';
-      doc.text(`Period: ${monthLabel} ${selectedYear}`, 14, 46);
-      doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, 14, 52);
+      doc.text(`Period: ${monthLabel} ${selectedYear}`, margin, yPosition);
+      yPosition += 6;
+      doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, margin, yPosition);
+      yPosition += 10;
 
-      // Add table
-      const headers = ['Date', 'Day', 'Status', 'Scan Time'];
+      // Table setup
+      const headers = ['Date', 'Day', 'Status', 'Time'];
+      const colCount = headers.length;
+      const usableWidth = pageWidth - 2 * margin;
+      const colWidth = usableWidth / colCount;
+
+      // Draw table headers
+      doc.setFillColor(0, 102, 179);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(9);
+
+      let xPos = margin;
+      headers.forEach((header) => {
+        doc.text(header, xPos + 2, yPosition + 4, { maxWidth: colWidth - 4, align: 'left' });
+        xPos += colWidth;
+      });
+      yPosition += lineHeight + 2;
+
+      // Draw table rows
       const rows = attendanceStats.recentAttendance.map(record => [
         new Date(record.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
         new Date(record.date).toLocaleDateString('en-IN', { weekday: 'short' }),
         record.status,
         record.scan_time
-          ? new Date(record.scan_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+          ? new Date(record.scan_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
           : '-'
       ]);
 
-      doc.autoTable({
-        head: [headers],
-        body: rows,
-        startY: 60,
-        theme: 'grid',
-        headStyles: {
-          fillColor: [0, 102, 179],
-          textColor: 255,
-          fontStyle: 'bold',
-          halign: 'center'
-        },
-        bodyStyles: {
-          textColor: 50,
-          halign: 'center'
-        },
-        alternateRowStyles: {
-          fillColor: [245, 245, 245]
+      doc.setTextColor(50, 50, 50);
+      doc.setFont(undefined, 'normal');
+      let bgColor = false;
+
+      rows.forEach((row) => {
+        if (yPosition > pageHeight - 25) {
+          doc.addPage();
+          yPosition = margin;
         }
+
+        if (bgColor) {
+          doc.setFillColor(245, 245, 245);
+        } else {
+          doc.setFillColor(255, 255, 255);
+        }
+        doc.rect(margin, yPosition - 3, usableWidth, lineHeight + 2, 'F');
+        bgColor = !bgColor;
+
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(margin, yPosition - 3, usableWidth, lineHeight + 2);
+
+        xPos = margin;
+        row.forEach((cell) => {
+          doc.text(String(cell), xPos + 2, yPosition + 2, { maxWidth: colWidth - 4, align: 'left' });
+          xPos += colWidth;
+        });
+        yPosition += lineHeight + 2;
       });
 
-      // Add statistics
-      const finalY = doc.lastAutoTable.finalY + 15;
-      doc.setFontSize(11);
-      doc.text(`Total Days Present: ${attendanceStats.stats.presentDays}`, 14, finalY);
-      doc.text(`Total Days Absent: ${attendanceStats.stats.absentDays}`, 14, finalY + 7);
-      doc.text(`Attendance Percentage: ${attendanceStats.stats.percentage}%`, 14, finalY + 14);
+      // Add statistics at bottom
+      yPosition += 5;
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text(`Statistics:`, margin, yPosition);
+      yPosition += 6;
+      doc.setFont(undefined, 'normal');
+      doc.text(`Days Present: ${attendanceStats.stats.presentDays}`, margin, yPosition);
+      yPosition += 5;
+      doc.text(`Days Absent: ${attendanceStats.stats.absentDays}`, margin, yPosition);
+      yPosition += 5;
+      doc.text(`Attendance: ${attendanceStats.stats.percentage}%`, margin, yPosition);
 
       const monthLabel2 = selectedMonth ? months.find(m => m.value === selectedMonth)?.label || selectedMonth : 'Overall';
       doc.save(`my-attendance-${monthLabel2}-${selectedYear}.pdf`);
