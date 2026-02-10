@@ -198,19 +198,20 @@ serve(async (req) => {
       }
 
       const attId = `${student.id}-${today}`;
+      const scanTime = new Date().toISOString();
       const { error } = await supabase.from("attendance").insert({
         id: attId,
         student_id: student.id,
         date: today,
         status: "present",
-        scan_time: new Date().toISOString(),
+        scan_time: scanTime,
         scanner_id: null,
         finalized: false,
       });
 
       if (error) throw error;
 
-      return respond({ ok: true, message: "marked", student_name: student.name });
+      return respond({ ok: true, message: "marked", student_name: student.name, scan_time: scanTime });
     }
 
     // ── GET DAILY ATTENDANCE ────────────────────────────────
