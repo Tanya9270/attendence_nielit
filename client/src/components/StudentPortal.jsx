@@ -244,6 +244,11 @@ export default function StudentPortal() {
   const downloadMyPDF = async () => {
     if (!attendanceStats || !attendanceStats.recentAttendance) return;
     try {
+      console.log('=== PDF Generation Debug ===');
+      console.log('selectedMonth:', selectedMonth);
+      console.log('selectedYear:', selectedYear);
+      console.log('recentAttendance:', attendanceStats.recentAttendance);
+
       const { jsPDF } = await import('jspdf');
       const doc = new jsPDF('landscape');
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -315,6 +320,7 @@ export default function StudentPortal() {
 
       // === CALENDAR TABLE ===
       const lastDay = selectedMonth ? new Date(selectedYear, parseInt(selectedMonth), 0).getDate() : 31;
+      console.log('lastDay:', lastDay);
 
       // Create attendance map
       const attendanceMap = {};
@@ -322,11 +328,13 @@ export default function StudentPortal() {
         // Parse date as YYYY-MM-DD in local timezone to avoid timezone shifts
         const [year, month, day] = record.date.split('-');
         const dayNum = parseInt(day, 10);
+        console.log(`Processing record - date: ${record.date}, dayNum: ${dayNum}, status: ${record.status}, scanTime: ${record.scan_time}`);
         attendanceMap[dayNum] = {
           status: record.status.charAt(0).toUpperCase(),
           scanTime: record.scan_time
         };
       });
+      console.log('attendanceMap:', attendanceMap);
 
       // Header row with day numbers
       const dayWidth = (pageWidth - 2 * margin - 50) / (lastDay + 1); // +1 for P column
@@ -416,10 +424,15 @@ export default function StudentPortal() {
         let cellText = '-';
         let textColor = [150, 150, 150];
 
+        if (day === 10) {
+          console.log(`Day 10 Debug - dayData:`, dayData, 'isWeekend:', isWeekend);
+        }
+
         if (isWeekend) {
           cellText = 'OFF';
           textColor = [150, 150, 150];
         } else if (dayData) {
+          console.log(`Day ${day} has data - status: ${dayData.status}, comparing with 'P'`);
           if (dayData.status === 'P') {
             cellText = '✓';
             textColor = [45, 125, 50]; // Green
