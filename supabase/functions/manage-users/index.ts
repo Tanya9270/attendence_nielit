@@ -183,8 +183,8 @@ serve(async (req) => {
       if (sErr) {
         // Provide clear error message
         if (sErr.code === '23505') {
-          if (sErr.message.includes('roll_number')) {
-            throw new Error(`Roll number ${roll_number} is already registered`);
+          if (sErr.message.includes('roll_number') || sErr.message.includes('unique_students_roll_number_per_course')) {
+            throw new Error(`Roll number ${roll_number} is already registered for course ${course_code}`);
           } else if (sErr.message.includes('user_id')) {
             throw new Error('This account already has a student record');
           } else if (sErr.message.includes('email')) {
