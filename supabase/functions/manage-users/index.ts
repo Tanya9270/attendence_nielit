@@ -120,6 +120,20 @@ serve(async (req) => {
     const { data: userList } = await supabase.auth.admin.listUsers();
     let targetId = userList.users.find(u => u.email?.toLowerCase() === email.toLowerCase())?.id;
 
+    // Check if creating a new student when email already exists for a different user type
+    if (targetId && type === 'student') {
+      // Check if this auth user is already a student with a different roll number
+      const { data: existingStudent } = await supabase
+        .from('students')
+        .select('roll_number')
+        .eq('email', email.toLowerCase())
+        .single();
+
+      if (existingStudent && existingStudent.roll_number !== roll_number) {
+        throw new Error('This email is already registered with a different roll number');
+      }
+    }
+
     if (!targetId) {
       const metadata = type === 'student'
         ? { roll_number, name, course_code, role: 'student' }
@@ -148,22 +162,27 @@ serve(async (req) => {
       }, { onConflict: 'course_code' });
       if (cErr) throw cErr;
     } else {
-      // For students: store auth UUID as text in user_id
-      // The students.user_id is integer, so we need a different approach
-      // We'll store the auth UUID in a way that's retrievable
-
-      // First, upsert the student record
-      const { error: sErr } = await supabase.from('students').upsert({
+      // For students: insert new student record
+      const { error: sErr } = await supabase.from('students').insert({
         roll_number,
         name,
-        course_code
-      }, { onConflict: 'roll_number' });
-      if (sErr) throw sErr;
+        email,
+        course_code,
+        user_id: targetId
+      });
 
-      // Store the auth UUID mapping in profiles (already done above)
-      // Store a reference: we'll use roll_number to link student <-> auth user
-      // Update the student record with a note about the auth user
-      // Since user_id is integer, we can't store UUID there directly
+      if (sErr) {
+        // If it's a duplicate roll number or email, try to update instead
+        if (sErr.code === '23505') { // PostgreSQL unique violation
+          const { error: updateErr } = await supabase.from('students')
+            .update({ name, course_code, user_id: targetId })
+            .eq('roll_number', roll_number);
+
+          if (updateErr) throw updateErr;
+        } else {
+          throw sErr;
+        }
+      }
     }
 
     return respond({ ok: true, message: "Success", authId: targetId });
