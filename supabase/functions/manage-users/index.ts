@@ -112,37 +112,6 @@ serve(async (req) => {
     const { data: userList } = await supabase.auth.admin.listUsers();
     let targetId = userList.users.find(u => u.email?.toLowerCase() === email.toLowerCase())?.id;
 
-    // Check if creating a new student when email already exists
-    if (targetId && type === 'student') {
-      // Check if this auth user is already a student
-      const { data: existingStudent } = await supabase
-        .from('students')
-        .select('roll_number, name')
-        .eq('user_id', targetId)
-        .maybeSingle();
-
-      if (existingStudent) {
-        // User already has a student account - update their info if roll number matches
-        if (existingStudent.roll_number === roll_number) {
-          // Same roll number - update the student's info
-          const { error: updateErr } = await supabase.from('students')
-            .update({ name, email, course_code })
-            .eq('user_id', targetId);
-          if (updateErr) throw updateErr;
-
-          // Also update auth metadata
-          await supabase.auth.admin.updateUserById(targetId, {
-            user_metadata: { roll_number, name, course_code, role: 'student' }
-          });
-
-          return respond({ ok: true, message: "Student info updated", authId: targetId });
-        } else {
-          // Different roll number - this email is already used by another student
-          throw new Error(`This email is already registered for student ${existingStudent.name} (Roll: ${existingStudent.roll_number})`);
-        }
-      }
-    }
-
     if (!targetId) {
       const metadata = type === 'student'
         ? { roll_number, name, course_code, role: 'student' }
@@ -153,7 +122,7 @@ serve(async (req) => {
       if (authErr) throw authErr;
       targetId = newUser.user.id;
     } else if (type === 'student') {
-      // Existing auth user — update metadata with roll_number
+      // Existing auth user — update metadata with roll_number and course
       await supabase.auth.admin.updateUserById(targetId, {
         user_metadata: { roll_number, name, course_code, role: 'student' }
       });
@@ -185,8 +154,6 @@ serve(async (req) => {
         if (sErr.code === '23505') {
           if (sErr.message.includes('roll_number') || sErr.message.includes('unique_students_roll_number_per_course')) {
             throw new Error(`Roll number ${roll_number} is already registered for course ${course_code}`);
-          } else if (sErr.message.includes('user_id')) {
-            throw new Error('This account already has a student record');
           } else if (sErr.message.includes('email')) {
             throw new Error('This email is already registered');
           }
