@@ -166,6 +166,7 @@ serve(async (req) => {
       const { error: sErr } = await supabase.from('students').insert({
         roll_number,
         name,
+        email,
         course_code,
         user_id: targetId
       });
@@ -174,7 +175,7 @@ serve(async (req) => {
         // If it's a duplicate roll number, try to update instead
         if (sErr.code === '23505') { // PostgreSQL unique violation
           const { error: updateErr } = await supabase.from('students')
-            .update({ name, course_code, user_id: targetId })
+            .update({ name, email, course_code, user_id: targetId })
             .eq('roll_number', roll_number);
 
           if (updateErr) throw updateErr;
