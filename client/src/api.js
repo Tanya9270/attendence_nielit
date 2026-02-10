@@ -499,6 +499,14 @@ export const api = {
 
       const data = await response.json();
 
+      // Check for rate limiting
+      if (response.status === 429) {
+        return {
+          ok: false,
+          error: 'Too many password reset requests. Please wait 15-30 minutes before trying again, or check your email for a previous reset link.'
+        };
+      }
+
       // Check both the response status and data for errors
       if (!response.ok || data.error) {
         return { ok: false, error: data.error?.message || data.message || 'Failed to send reset email' };
