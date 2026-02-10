@@ -140,7 +140,26 @@ serve(async (req) => {
       }, { onConflict: 'course_code' });
       if (cErr) throw cErr;
     } else {
-      // For students: insert new student record
+      // For students: check if student with this roll_number and course already exists
+      const { data: existingByCourse } = await supabase
+        .from('students')
+        .select('*')
+        .eq('roll_number', roll_number)
+        .eq('course_code', course_code)
+        .maybeSingle();
+
+      if (existingByCourse) {
+        // Student with this roll number already exists in this course - update their info
+        const { error: updateErr } = await supabase.from('students')
+          .update({ name, email, user_id: targetId })
+          .eq('roll_number', roll_number)
+          .eq('course_code', course_code);
+
+        if (updateErr) throw updateErr;
+        return respond({ ok: true, message: "Student info updated", authId: targetId });
+      }
+
+      // Insert new student record
       const { error: sErr } = await supabase.from('students').insert({
         roll_number,
         name,
