@@ -126,11 +126,11 @@ serve(async (req) => {
       const { data: existingStudent } = await supabase
         .from('students')
         .select('roll_number')
-        .eq('email', email.toLowerCase())
-        .single();
+        .eq('user_id', targetId)
+        .maybeSingle();
 
       if (existingStudent && existingStudent.roll_number !== roll_number) {
-        throw new Error('This email is already registered with a different roll number');
+        throw new Error('This account is already registered with a different roll number');
       }
     }
 
@@ -166,13 +166,12 @@ serve(async (req) => {
       const { error: sErr } = await supabase.from('students').insert({
         roll_number,
         name,
-        email,
         course_code,
         user_id: targetId
       });
 
       if (sErr) {
-        // If it's a duplicate roll number or email, try to update instead
+        // If it's a duplicate roll number, try to update instead
         if (sErr.code === '23505') { // PostgreSQL unique violation
           const { error: updateErr } = await supabase.from('students')
             .update({ name, course_code, user_id: targetId })
