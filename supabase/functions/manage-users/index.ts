@@ -73,19 +73,11 @@ serve(async (req) => {
       }
 
       if (deleteType === 'student') {
-        const studentId = body.studentId; // integer ID from students table
+        // userId is the UUID from auth.users - this is what we use to identify the student
+        // Delete student record by user_id
+        await supabase.from('students').delete().eq('user_id', userId);
 
-        // Get student info to find auth user
-        const { data: student } = await supabase
-          .from('students')
-          .select('*')
-          .eq('id', studentId)
-          .maybeSingle();
-
-        // Delete student record
-        await supabase.from('students').delete().eq('id', studentId);
-
-        // If userId is a valid UUID, also delete auth user and profile
+        // Delete auth user and profile
         if (userId && typeof userId === 'string' && userId.includes('-')) {
           await supabase.from('profiles').delete().eq('id', userId);
           try {
