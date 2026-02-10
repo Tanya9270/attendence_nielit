@@ -188,13 +188,13 @@ serve(async (req) => {
       // Check duplicate
       const { data: existing } = await supabase
         .from("attendance")
-        .select("id")
+        .select("id, scan_time")
         .eq("student_id", student.id)
         .eq("date", today)
         .maybeSingle();
 
       if (existing) {
-        return respond({ ok: true, message: "already_marked" });
+        return respond({ ok: true, message: "already_marked", scan_time: existing.scan_time });
       }
 
       const attId = `${student.id}-${today}`;
