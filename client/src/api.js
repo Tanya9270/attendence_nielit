@@ -487,17 +487,27 @@ export const api = {
   // ── Password Reset ────────────────────────────────────────
   async forgotPassword(email) {
     const redirectUrl = `${window.location.origin}/reset-password`;
-    const { error } = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
-      body: JSON.stringify({
-        email,
-        options: {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
+        body: JSON.stringify({
+          email,
           redirectTo: redirectUrl
-        }
-      })
-    }).then(r => r.json());
-    return { ok: !error, error: error?.message };
+        })
+      });
+
+      const data = await response.json();
+
+      // Check both the response status and data for errors
+      if (!response.ok || data.error) {
+        return { ok: false, error: data.error?.message || data.message || 'Failed to send reset email' };
+      }
+
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
   },
 
   async resetPassword(email, token, password) {
