@@ -319,7 +319,9 @@ export default function StudentPortal() {
       // Create attendance map
       const attendanceMap = {};
       attendanceStats.recentAttendance.forEach(record => {
-        const dayNum = new Date(record.date).getDate();
+        // Parse date as YYYY-MM-DD in local timezone to avoid timezone shifts
+        const [year, month, day] = record.date.split('-');
+        const dayNum = parseInt(day, 10);
         attendanceMap[dayNum] = {
           status: record.status.charAt(0).toUpperCase(),
           scanTime: record.scan_time
@@ -426,7 +428,8 @@ export default function StudentPortal() {
               const scanTime = new Date(dayData.scanTime).toLocaleTimeString('en-IN', {
                 hour: '2-digit',
                 minute: '2-digit',
-                hour12: true
+                hour12: true,
+                timeZone: 'Asia/Kolkata'
               });
               cellText = `✓\n${scanTime}`;
             }
@@ -482,7 +485,7 @@ export default function StudentPortal() {
       doc.setFontSize(6);
       doc.setTextColor(150, 150, 150);
       doc.text(
-        `Generated on: ${new Date().toLocaleString('en-IN')}`,
+        `Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`,
         margin,
         pageHeight - 5
       );
