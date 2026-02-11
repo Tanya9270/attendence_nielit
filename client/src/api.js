@@ -213,10 +213,10 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
   doc.text('Student', margin + 2, yPosition - 1);
 
   // Day numbers header - always show 1-31, no OFF here
-  xPos = margin + 50;
+    xPos = margin + 50;
   for (let day = 1; day <= lastDay; day++) {
     // Check if this is a session day (at least one student has attendance for this day)
-    const isSessionDay = students.some(s => attendanceData[s.student_id]?.[day.toString().padStart(2, '0')]);
+    const isSessionDay = students.some(s => attendanceData[s.id]?.[day.toString().padStart(2, '0')]);
 
     // Check if it's weekend (Saturday=6, Sunday=0)
     const dateObj = new Date(year, monthNum - 1, day);
@@ -274,9 +274,9 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
       doc.setTextColor(255, 255, 255);
       doc.text('Student', margin + 2, yPosition - 1);
 
-      xPos = margin + 50;
-      for (let day = 1; day <= lastDay; day++) {
-        const isSessionDay = students.some(s => attendanceData[s.student_id]?.[day.toString().padStart(2, '0')]);
+            xPos = margin + 50;
+            for (let day = 1; day <= lastDay; day++) {
+              const isSessionDay = students.some(s => attendanceData[s.id]?.[day.toString().padStart(2, '0')]);
 
         // Check if it's weekend (Saturday=6, Sunday=0)
         const dateObj = new Date(year, monthNum - 1, day);
@@ -341,7 +341,7 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
       const dayStr = day.toString().padStart(2, '0');
-      const attendanceStatus = attendanceData[student.student_id]?.[dayStr];
+      const attendanceStatus = attendanceData[student.id]?.[dayStr];
       let cellText = '-';
       let textColor = [150, 150, 150];
 
@@ -598,14 +598,14 @@ export const api = {
     const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
 
     // Build attendance data map: {studentId: {DD: 'P'/'A'/'L'}}
-    const attendanceMap = {};
+        const attendanceMap = {};
     students.forEach(student => {
-      attendanceMap[student.student_id] = {};
+      attendanceMap[student.id] = {};
       if (student.daily && Array.isArray(student.daily)) {
         student.daily.forEach((dayData, dayIdx) => {
           const dayKey = String(dayData.day).padStart(2, '0');
           if (dayData.status === 'present') {
-            attendanceMap[student.student_id][dayKey] = 'P';
+            attendanceMap[student.id][dayKey] = 'P';
           } else if (dayData.status === 'absent') {
             attendanceMap[student.student_id][dayKey] = 'A';
           } else if (dayData.status === 'leave') {
@@ -617,7 +617,7 @@ export const api = {
 
     console.log('Student data:', students);
     console.log('Attendance map:', attendanceMap);
-    
+
     const title = `Monthly Attendance Report - ${monthName} ${year}`;
     return await generateMonthlyCalendarPDF(
       title,
