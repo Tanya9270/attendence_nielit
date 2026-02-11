@@ -16,10 +16,19 @@ async function run() {
     }
     const token = loginJson.token;
 
-    const date = '2026-01-20';
-    const course = 'JAI-001';
-    const url = `${base}/api/export/daily/pdf?date=${date}&course_code=${course}`;
-    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    // Use today's date instead of hardcoded date
+    const today = new Date();
+    const date = today.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    const course = 'JAO-001'; // Match your actual course code
+    
+    const url = `${base}/api/export/daily/pdf?date=${date}&course_code=${course}&_t=${Date.now()}`;
+    const res = await fetch(url, { 
+      headers: { 
+        Authorization: 'Bearer ' + token,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      } 
+    });
     if (!res.ok) {
       console.error('Export request failed', res.status);
       const txt = await res.text();
