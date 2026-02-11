@@ -596,18 +596,19 @@ export const api = {
     const faculty = data.faculty || '[Faculty Name]';
     const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
 
-    // Build attendance data map: {studentId: {DD-MM-YYYY: 'P'/'A'/'L'}}
+        // Build attendance data map: {studentId: {DD: 'P'/'A'/'L'}}
     const attendanceMap = {};
     students.forEach(student => {
       attendanceMap[student.student_id] = {};
       if (student.daily && Array.isArray(student.daily)) {
         student.daily.forEach((dayData, dayIdx) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
           if (dayData.status === 'present') {
-            attendanceMap[student.student_id][dayData.day] = 'P';
+            attendanceMap[student.student_id][dayKey] = 'P';
           } else if (dayData.status === 'absent') {
-            attendanceMap[student.student_id][dayData.day] = 'A';
+            attendanceMap[student.student_id][dayKey] = 'A';
           } else if (dayData.status === 'leave') {
-            attendanceMap[student.student_id][dayData.day] = 'L';
+            attendanceMap[student.student_id][dayKey] = 'L';
           }
         });
       }
