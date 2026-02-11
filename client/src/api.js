@@ -177,8 +177,25 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
   const monthNum = monthMap[monthName] || 1;
   const lastDay = new Date(year, monthNum, 0).getDate();
 
-  // Count session days
-  const sessionDays = students.length > 0 ? Object.keys(attendanceData[students[0].student_id] || {}).length : 0;
+  // Count session days - find any day that has attendance records
+  let sessionDays = 0;
+  if (students.length > 0) {
+    const monthMap = { 'January': 1, 'February': 2, 'March': 3, 'April': 4, 'May': 5, 'June': 6,
+                       'July': 7, 'August': 8, 'September': 9, 'October': 10, 'November': 11, 'December': 12 };
+    const monthNum = monthMap[monthName] || 1;
+    const lastDay = new Date(year, monthNum, 0).getDate();
+    
+    // Count unique days with attendance across all students
+    const daysWithAttendance = new Set();
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      const studentAttendance = attendanceMap[studentId] || {};
+      Object.keys(studentAttendance).forEach(day => {
+        daysWithAttendance.add(day);
+      });
+    });
+    sessionDays = daysWithAttendance.size;
+  }
 
   doc.setFontSize(8);
   doc.text(
@@ -286,9 +303,9 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
         if (isWeekend) {
           doc.setFillColor(255, 200, 200); // Light red for weekends
         } else if (isSessionDay) {
-          doc.setFillColor(100, 180, 100);
+          doc.setFillColor(100, 180, 100); // Green for session days
         } else {
-          doc.setFillColor(200, 200, 200);
+          doc.setFillColor(200, 200, 200); // Gray for non-session days
         }
         doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight, 'F');
         doc.setDrawColor(100, 100, 100);
@@ -581,13 +598,12 @@ export const api = {
       s.name,
       s.course_code,
       s.status,
-      s.scan_time ? new Date(s.scan_time).toLocaleTimeString('en-IN') : '-'
+      s.scan_time ? new Date(s.scan_time).toLocaleTimeString('en-IN') : '-' new Set(); // Track all days with any attendance
     ]);
     return generateCSV(hdrs, rows);
   },
 
   // ── Export: Monthly PDF (client-side generation) ───────────
-    // ── Export: Monthly PDF (client-side generation) ───────────
   async exportMonthlyPDF(token, month, year, className, section, courseCode) {
     const data = await attApi(token, { action: 'get-monthly', month, year, course_code: courseCode });
     if (!data.ok) throw new Error('Failed to load monthly data');
@@ -597,19 +613,22 @@ export const api = {
     const faculty = data.faculty || '[Faculty Name]';
     const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
 
-    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L'}}
-        const attendanceMap = {};
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
     students.forEach(student => {
-      attendanceMap[student.id] = {};
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
       if (student.daily && Array.isArray(student.daily)) {
-        student.daily.forEach((dayData, dayIdx) => {
+        student.daily.forEach((dayData) => {
           const dayKey = String(dayData.day).padStart(2, '0');
+          
           if (dayData.status === 'present') {
-            attendanceMap[student.id][dayKey] = 'P';
+            attendanceMap[studentId][dayKey] = 'P';
           } else if (dayData.status === 'absent') {
-            attendanceMap[student.student_id][dayKey] = 'A';
+            attendanceMap[studentId][dayKey] = 'A';
           } else if (dayData.status === 'leave') {
-            attendanceMap[student.student_id][dayKey] = 'L';
+            attendanceMap[studentId][dayKey] = 'L';
           }
         });
       }
@@ -630,12 +649,41 @@ export const api = {
       faculty
     );
   },
+
   // ── Export: Monthly CSV ───────────────────────────────────
   async exportMonthlyCSV(token, month, year, className, section, courseCode) {
     const data = await attApi(token, { action: 'get-monthly', month, year, course_code: courseCode });
     if (!data.ok) throw new Error('Failed to load monthly data');
-
     const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
     const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
     const rows = students.map((s, i) => [
       i + 1,
@@ -650,18 +698,1734 @@ export const api = {
 
   // ── Export: Legacy CSV ────────────────────────────────────
   async exportAttendance(token, date, className, section, courseCode) {
-    return this.exportDailyCSV(token, date, className, section, courseCode);
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
   },
 
-  // ── Student: Get My Profile ───────────────────────────────
-  async getStudentMe(token) {
-    const user = getCurrentUser();
-    return attApi(token, { action: 'student-me', user_id: user.id });
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
   },
 
-  // ── Student: Get Attendance Stats ─────────────────────────
-  async getStudentAttendanceStatsByMonth(token, month, year) {
-    const user = getCurrentUser();
-    return attApi(token, { action: 'student-stats', user_id: user.id, month, year });
-  }
-};
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log('Student data:', students);
+    console.log('Attendance map:', attendanceMap);
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.present,
+      s.absent,
+      s.percentage + '%'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
+    const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
+    const attendanceMap = {};
+    students.forEach(student => {
+      const studentId = student.id || student.student_id;
+      attendanceMap[studentId] = {};
+      
+      if (student.daily && Array.isArray(student.daily)) {
+        student.daily.forEach((dayData) => {
+          const dayKey = String(dayData.day).padStart(2, '0');
+          
+          if (dayData.status === 'present') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (dayData.status === 'absent') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (dayData.status === 'leave') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+    });
+
+    console.log
