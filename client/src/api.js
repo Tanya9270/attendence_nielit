@@ -609,49 +609,135 @@ export const api = {
       if (!student.id && student.student_id) {
         student.id = student.student_id;
       }
+      if (!student.id && student.user_id) {
+        student.id = student.user_id;
+      }
     });
+
+    // DEBUG: Log raw API response to understand the structure
+    console.log('=== MONTHLY PDF DEBUG ===');
+    console.log('Raw API response keys:', Object.keys(data));
+    console.log('Number of students:', students.length);
+    if (students.length > 0) {
+      console.log('First student ALL keys:', Object.keys(students[0]));
+      console.log('First student FULL object:', JSON.stringify(students[0], null, 2));
+    }
 
     // Build attendance data map: {studentId: {DD: 'P'/'A'/'L' }}
     const attendanceMap = {};
     students.forEach(student => {
       const studentId = student.id;
       attendanceMap[studentId] = {};
-      
+
+      // Format 1: student.daily = [{day: 1, status: 'present'}, ...]
       if (student.daily && Array.isArray(student.daily)) {
+        console.log(`Student ${student.name} daily[0]:`, JSON.stringify(student.daily[0]));
         student.daily.forEach((dayData) => {
-          const dayKey = String(dayData.day).padStart(2, '0');
-          
-          if (dayData.status === 'present') {
+          let dayKey;
+
+          if (dayData.day !== undefined) {
+            // day is a number like 1, 2, 3...
+            dayKey = String(dayData.day).padStart(2, '0');
+          } else if (dayData.date) {
+            // date is a full date string like "2025-02-10"
+            const d = new Date(dayData.date);
+            dayKey = String(d.getDate()).padStart(2, '0');
+          }
+
+          if (!dayKey) return;
+
+          const status = (dayData.status || '').toLowerCase();
+          if (status === 'present' || status === 'p') {
             attendanceMap[studentId][dayKey] = 'P';
-          } else if (dayData.status === 'absent') {
+          } else if (status === 'absent' || status === 'a') {
             attendanceMap[studentId][dayKey] = 'A';
-          } else if (dayData.status === 'leave') {
+          } else if (status === 'leave' || status === 'l') {
             attendanceMap[studentId][dayKey] = 'L';
           }
         });
       }
 
-      // Also check for attendance_records or records array
+      // Format 2: student.attendance_records = [{date: '2025-02-10', status: 'present'}, ...]
       if (student.attendance_records && Array.isArray(student.attendance_records)) {
         student.attendance_records.forEach((rec) => {
           const recDate = new Date(rec.date || rec.created_at);
           if (recDate.getMonth() + 1 === Number(month) && recDate.getFullYear() === Number(year)) {
             const dayKey = String(recDate.getDate()).padStart(2, '0');
-            if (rec.status === 'present' || rec.status === 'P') {
+            const status = (rec.status || '').toLowerCase();
+            if (status === 'present' || status === 'p') {
               attendanceMap[studentId][dayKey] = 'P';
-            } else if (rec.status === 'absent' || rec.status === 'A') {
+            } else if (status === 'absent' || status === 'a') {
               attendanceMap[studentId][dayKey] = 'A';
-            } else if (rec.status === 'leave' || rec.status === 'L') {
+            } else if (status === 'leave' || status === 'l') {
               attendanceMap[studentId][dayKey] = 'L';
             }
           }
         });
       }
+
+      // Format 3: student.attendance = {1: 'P', 2: 'A', ...} or {'01': 'P', ...}
+      if (student.attendance && typeof student.attendance === 'object' && !Array.isArray(student.attendance)) {
+        Object.entries(student.attendance).forEach(([key, val]) => {
+          const dayKey = String(key).padStart(2, '0');
+          const status = (val || '').toString().toLowerCase();
+          if (status === 'present' || status === 'p') {
+            attendanceMap[studentId][dayKey] = 'P';
+          } else if (status === 'absent' || status === 'a') {
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (status === 'leave' || status === 'l') {
+            attendanceMap[studentId][dayKey] = 'L';
+          }
+        });
+      }
+
+      // Format 4: student has present/absent counts but daily data is at top-level data.attendance
+      console.log(`Student ${student.name} (${studentId}): mapped days =`, Object.keys(attendanceMap[studentId]).length, attendanceMap[studentId]);
     });
 
-    console.log('Student data:', JSON.stringify(students, null, 2));
-    console.log('Attendance map:', JSON.stringify(attendanceMap, null, 2));
-    console.log('First student keys:', students.length > 0 ? Object.keys(students[0]) : 'no students');
+    // Format 5: data.attendance = {studentId: {DD: status}} at top level
+    if (data.attendance && typeof data.attendance === 'object') {
+      console.log('Found top-level data.attendance, keys:', Object.keys(data.attendance).slice(0, 3));
+      Object.entries(data.attendance).forEach(([sid, days]) => {
+        if (!attendanceMap[sid]) attendanceMap[sid] = {};
+        if (typeof days === 'object') {
+          Object.entries(days).forEach(([key, val]) => {
+            const dayKey = String(key).padStart(2, '0');
+            const status = (val || '').toString().toLowerCase();
+            if (status === 'present' || status === 'p') {
+              attendanceMap[sid][dayKey] = 'P';
+            } else if (status === 'absent' || status === 'a') {
+              attendanceMap[sid][dayKey] = 'A';
+            } else if (status === 'leave' || status === 'l') {
+              attendanceMap[sid][dayKey] = 'L';
+            }
+          });
+        }
+      });
+    }
+
+    // Format 6: data.records = [{student_id, date, status}, ...]
+    if (data.records && Array.isArray(data.records)) {
+      console.log('Found top-level data.records, count:', data.records.length);
+      data.records.forEach(rec => {
+        const sid = rec.student_id || rec.user_id || rec.id;
+        if (!attendanceMap[sid]) attendanceMap[sid] = {};
+        const recDate = new Date(rec.date || rec.created_at);
+        if (recDate.getMonth() + 1 === Number(month) && recDate.getFullYear() === Number(year)) {
+          const dayKey = String(recDate.getDate()).padStart(2, '0');
+          const status = (rec.status || '').toLowerCase();
+          if (status === 'present' || status === 'p') {
+            attendanceMap[sid][dayKey] = 'P';
+          } else if (status === 'absent' || status === 'a') {
+            attendanceMap[sid][dayKey] = 'A';
+          } else if (status === 'leave' || status === 'l') {
+            attendanceMap[sid][dayKey] = 'L';
+          }
+        }
+      });
+    }
+
+    console.log('=== FINAL ATTENDANCE MAP ===');
+    console.log(JSON.stringify(attendanceMap, null, 2));
 
     const title = `Monthly Attendance Report - ${monthName} ${year}`;
     return await generateMonthlyCalendarPDF(
@@ -676,6 +762,9 @@ export const api = {
     students.forEach(student => {
       if (!student.id && student.student_id) {
         student.id = student.student_id;
+      }
+      if (!student.id && student.user_id) {
+        student.id = student.user_id;
       }
     });
 
