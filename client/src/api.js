@@ -589,6 +589,7 @@ export const api = {
   console.log('Attendance map:', attendanceMap);
 
   // ── Export: Monthly PDF (client-side generation) ───────────
+    // ── Export: Monthly PDF (client-side generation) ───────────
   async exportMonthlyPDF(token, month, year, className, section, courseCode) {
     const data = await attApi(token, { action: 'get-monthly', month, year, course_code: courseCode });
     if (!data.ok) throw new Error('Failed to load monthly data');
@@ -598,7 +599,7 @@ export const api = {
     const faculty = data.faculty || '[Faculty Name]';
     const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
 
-        // Build attendance data map: {studentId: {DD: 'P'/'A'/'L'}}
+    // Build attendance data map: {studentId: {DD: 'P'/'A'/'L'}}
     const attendanceMap = {};
     students.forEach(student => {
       attendanceMap[student.student_id] = {};
@@ -628,7 +629,6 @@ export const api = {
       faculty
     );
   },
-
   // ── Export: Monthly CSV ───────────────────────────────────
   async exportMonthlyCSV(token, month, year, className, section, courseCode) {
     const data = await attApi(token, { action: 'get-monthly', month, year, course_code: courseCode });
