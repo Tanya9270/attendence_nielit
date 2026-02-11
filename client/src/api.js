@@ -585,6 +585,8 @@ export const api = {
     ]);
     return generateCSV(hdrs, rows);
   },
+  console.log('Student data:', students);
+  console.log('Attendance map:', attendanceMap);
 
   // ── Export: Monthly PDF (client-side generation) ───────────
   async exportMonthlyPDF(token, month, year, className, section, courseCode) {
