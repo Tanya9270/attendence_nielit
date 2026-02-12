@@ -459,13 +459,14 @@ export async function exportMonthlyPDF(courseCode, month, year) {
       if (Array.isArray(records)) {
         records.forEach(record => {
           const dateStr = (record.date || record.created_at).split('T')[0];
-          const dayKey = dateStr.split('-')[2]; // Gets DD part directly from string
-          
+          const dayKey = dateStr.split('-')[2].padStart(2, '0'); // Ensure 2-digit day with leading zero
           const status = (record.status || '').toLowerCase();
           if (status === 'present' || status === 'p') {
-              attendanceMap[studentId][dayKey] = 'P';
+            attendanceMap[studentId][dayKey] = 'P';
           } else if (status === 'absent' || status === 'a') {
-              attendanceMap[studentId][dayKey] = 'A';
+            attendanceMap[studentId][dayKey] = 'A';
+          } else if (status === 'leave' || status === 'l') {
+            attendanceMap[studentId][dayKey] = 'L';
           }
         });
       }
@@ -704,10 +705,11 @@ export const api = {
       if (Array.isArray(records)) {
         records.forEach(rec => {
           const dateStr = (rec.date || rec.created_at).split('T')[0];
-          const dayKey = dateStr.split('-')[2];
+          const dayKey = dateStr.split('-')[2].padStart(2, '0');
           const status = (rec.status || '').toLowerCase();
           if (status === 'present' || status === 'p') attendanceMap[sId][dayKey] = 'P';
           else if (status === 'absent' || status === 'a') attendanceMap[sId][dayKey] = 'A';
+          else if (status === 'leave' || status === 'l') attendanceMap[sId][dayKey] = 'L';
         });
       }
     });
