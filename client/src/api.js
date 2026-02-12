@@ -13,7 +13,7 @@ const edgeFn = (token) => ({
   'x-mark-fn-api-key': MARK_FN_KEY
 });
 
-// Helper: call the attendance-api edge function (FIXED: now returns .ok status)
+// Helper: call the attendance-api edge function (STRICT FIX: Now returns .ok for UI logic)
 async function attApi(token, body) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/attendance-api`, {
     method: 'POST',
@@ -24,7 +24,7 @@ async function attApi(token, body) {
   return { ...data, ok: res.ok };
 }
 
-// Helper: call the manage-users edge function (FIXED: now returns .ok status)
+// Helper: call the manage-users edge function (STRICT FIX: Now returns .ok for UI logic)
 async function usersApi(token, body) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
     method: 'POST',
@@ -226,7 +226,7 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
     xPos = margin + 50;
   for (let day = 1; day <= lastDay; day++) {
     // Check if this is a session day (at least one student has attendance for this day)
-    const isSessionDay = students.some(s => attendanceData[s.id || s.student_id || s.user_id]?.[day.toString().padStart(2, '0')]);
+    const isSessionDay = students.some(s => attendanceData[s.id || s.student_id]?.[day.toString().padStart(2, '0')]);
 
     // Check if it's weekend (Saturday=6, Sunday=0)
     const dateObj = new Date(year, monthNum - 1, day);
@@ -273,7 +273,7 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
       doc.addPage('landscape');
       yPosition = margin;
 
-      // Redraw header on new page (FIXED to ensure IDs match)
+      // Redraw header on new page
       xPos = margin;
       doc.setFillColor(150, 150, 150);
       doc.rect(margin, yPosition - cellHeight + 0.5, 50, cellHeight, 'F');
@@ -288,21 +288,26 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
             for (let day = 1; day <= lastDay; day++) {
               const isSessionDay = students.some(s => attendanceData[s.id || s.student_id || s.user_id]?.[day.toString().padStart(2, '0')]);
 
+        // Check if it's weekend (Saturday=6, Sunday=0)
         const dateObj = new Date(year, monthNum - 1, day);
         const dayOfWeek = dateObj.getDay();
-        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
 
         if (isWeekend) {
-          doc.setFillColor(255, 200, 200);
+          doc.setFillColor(255, 200, 200); // Light red for weekends
         } else if (isSessionDay) {
-          doc.setFillColor(100, 180, 100);
+          doc.setFillColor(100, 180, 100); // Green for session days
         } else {
-          doc.setFillColor(200, 200, 200);
+          doc.setFillColor(200, 200, 200); // Gray for non-session days
         }
         doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight, 'F');
         doc.setDrawColor(100, 100, 100);
         doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight);
-        doc.setFontSize(5); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
+        doc.setFontSize(5);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0);
+
+        // Always show day number
         doc.text(day.toString(), xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
         xPos += dayWidth;
       }
@@ -311,7 +316,9 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
       doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight, 'F');
       doc.setDrawColor(100, 100, 100);
       doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight);
-      doc.setFontSize(6); doc.setFont(undefined, 'bold'); doc.setTextColor(255, 255, 255);
+      doc.setFontSize(6);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(255, 255, 255);
       doc.text('P', xPos + dayWidth / 2 - 1, yPosition - 1, { align: 'center' });
 
       yPosition += cellHeight;
@@ -326,7 +333,7 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
     doc.setFontSize(6);
     doc.setFont(undefined, 'normal');
     doc.setTextColor(0, 0, 0);
-    doc.text(`${student.roll_number || student.id} ${student.name}`.substring(0, 30), margin + 1, yPosition - 1);
+    doc.text(`${student.roll_number || student.id} ${student.name}`, margin + 1, yPosition - 1);
 
     // Attendance cells
     xPos = margin + 50;
@@ -339,8 +346,10 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
       doc.setDrawColor(150, 150, 150);
       doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight);
 
+      // Check if weekend
       const dateObj = new Date(year, monthNum - 1, day);
-      const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+      const dayOfWeek = dateObj.getDay();
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
       const dayStr = day.toString().padStart(2, '0');
       const attendanceStatus = attendanceData[studentId]?.[dayStr];
@@ -349,6 +358,7 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
 
       if (isWeekend) {
         cellText = 'OFF';
+        textColor = [150, 150, 150];
       } else if (attendanceStatus === 'P') {
         cellText = '✓';
         textColor = [45, 125, 50]; // Green
@@ -369,6 +379,7 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
       xPos += dayWidth;
     }
 
+    // Present count column
     doc.setFillColor(255, 255, 255);
     doc.rect(xPos, yPosition - cellHeight + 0.5, dayWidth, cellHeight, 'F');
     doc.setDrawColor(150, 150, 150);
@@ -382,45 +393,106 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
     yPosition += cellHeight;
   });
 
-  // Legend and Footer...
+  // === LEGEND ===
   yPosition += 2;
-  doc.setFontSize(6); doc.setTextColor(50, 50, 50);
-  doc.text("Legend: ✓ Present | ✗ Absent | L Leave | W Weekend | H Holiday | - No Session", margin, yPosition);
+  doc.setFontSize(6);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(50, 50, 50);
+  doc.text(
+    "Legend: ✓ Present (with scan time) | ✗ Absent | L Leave | W Weekend | H Holiday | - No Session",
+    margin,
+    yPosition
+  );
+  yPosition += 3;
+
+  doc.setFontSize(5);
+  doc.text(
+    "Note: Session Days = Days when attendance was conducted. Green column headers indicate session days.",
+    margin,
+    yPosition
+  );
+
+  // === FOOTER ===
+  doc.setFontSize(6);
+  doc.setTextColor(150, 150, 150);
+  doc.text(
+    `Generated on: ${new Date().toLocaleString('en-IN')}`,
+    margin,
+    pageHeight - 3
+  );
+
   return new Blob([doc.output('arraybuffer')], { type: 'application/pdf' });
 }
 
-// Custom Export function (FIXED DATE PARSING)
+// === Custom Export: exportMonthlyPDF(courseCode, month, year) ===
 export async function exportMonthlyPDF(courseCode, month, year) {
   const user = getCurrentUser();
   const token = user.session?.access_token;
-  if (!token) { alert('Session expired. Please login again.'); return; }
+  if (!token) {
+    alert('Session expired. Please login again.');
+    return;
+  }
 
   try {
-    const data = await attApi(token, { action: 'get-monthly', course_code: courseCode, month, year });
-    if (!data.ok) { alert(`Error: ${data.error || 'Unknown error'}`); return; }
+    const data = await attApi(token, {
+      action: 'get-monthly',
+      course_code: courseCode,
+      month,
+      year
+    });
+
+    if (!data.ok) {
+      alert(`Error: ${data.error || 'Unknown error'}`);
+      return;
+    }
+
     const { students, monthName, faculty } = data;
 
+    // BUILD ATTENDANCE MAP FROM dailyRecords (FIXED: Timezone safe mapping)
     const attendanceMap = {};
     students.forEach(student => {
       const studentId = student.id || student.student_id || student.user_id;
       if (!studentId) return;
       attendanceMap[studentId] = {};
+      
       const records = student.dailyRecords || student.daily || student.attendance_records || [];
       if (Array.isArray(records)) {
         records.forEach(record => {
-          // Timezone safe parsing of YYYY-MM-DD strings
-          const dateParts = (record.date || record.created_at).split('T')[0].split('-');
-          const dayKey = dateParts[2]; // Gets DD part directly
+          const dateStr = (record.date || record.created_at).split('T')[0];
+          const dayKey = dateStr.split('-')[2]; // Gets DD part directly from string
+          
           const status = (record.status || '').toLowerCase();
-          if (status === 'present' || status === 'p') attendanceMap[studentId][dayKey] = 'P';
-          else if (status === 'absent' || status === 'a') attendanceMap[studentId][dayKey] = 'A';
+          if (status === 'present' || status === 'p') {
+              attendanceMap[studentId][dayKey] = 'P';
+          } else if (status === 'absent' || status === 'a') {
+              attendanceMap[studentId][dayKey] = 'A';
+          }
         });
       }
     });
 
-    const pdfBlob = await generateMonthlyCalendarPDF('Monthly Attendance Report', data.course_code, data.course_name, monthName, year, students, attendanceMap, faculty);
-    const url = URL.createObjectURL(pdfBlob); const a = document.createElement('a'); a.href = url; a.download = `Attendance_${courseCode}_${monthName}_${year}.pdf`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-  } catch (error) { alert('Failed to export PDF'); }
+    const pdfBlob = await generateMonthlyCalendarPDF(
+      'Monthly Attendance Report',
+      data.course_code,
+      data.course_name,
+      monthName,
+      year,
+      students,
+      attendanceMap,
+      faculty
+    );
+
+    const url = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Attendance_${courseCode}_${monthName}_${year}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    alert('Failed to export PDF');
+  }
 }
 
 export const api = {
@@ -444,42 +516,101 @@ export const api = {
     };
   },
 
+  // ── Admin: Create Teacher ─────────────────────────────────
   async createTeacher(token, name, email, password, code, courseName) {
     return usersApi(token, { type: 'teacher', email, password, name, course_code: code, course_name: courseName });
   },
 
+  // ── Admin: Create Student ─────────────────────────────────
   async createStudent(token, name, email, roll, password, code) {
     return usersApi(token, { type: 'student', email, roll_number: roll, name, password, course_code: code });
   },
 
+  // ── Admin: Get Teachers ───────────────────────────────────
   async getTeachers(token) {
     const data = await usersApi(token, { action: 'list', listType: 'teachers' });
     return Array.isArray(data.data || data) ? (data.data || data) : [];
   },
 
+  // ── Admin: Get Students ───────────────────────────────────
   async getStudents(token) {
     const data = await usersApi(token, { action: 'list', listType: 'students' });
     return Array.isArray(data.data || data) ? (data.data || data) : [];
   },
 
+  // ── Get Courses ───────────────────────────────────────────
   async getCourses(token) {
     const user = getCurrentUser();
-    if (user.role === 'teacher') return attApi(token, { action: 'get-courses', teacher_id: user.id });
+    if (user.role === 'teacher') {
+      return attApi(token, { action: 'get-courses', teacher_id: user.id });
+    }
     return usersApi(token, { action: 'list', listType: 'courses' });
   },
 
-  async deleteUser(token, userId) { return usersApi(token, { action: 'delete', userId }); },
-  async forgotPassword(email) {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/auth/v1/recover`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY }, body: JSON.stringify({ email, redirectTo: `${window.location.origin}/reset-password` }) });
-      const data = await response.json();
-      return { ok: response.ok, error: data.error?.message };
-    } catch (err) { return { ok: false, error: err.message }; }
+  // ── Admin: Delete User (generic) ────────────────────────
+  async deleteUser(token, userId) {
+    return usersApi(token, { action: 'delete', userId });
   },
 
-  async getServerTime() { return attApi('', { action: 'server-time' }); },
+  // ── Admin: Delete Teacher (by teacher_id or course_code) ─
+  async deleteTeacher(token, teacherId, courseCode) {
+    if (teacherId) {
+      return usersApi(token, { action: 'delete', deleteType: 'teacher', userId: teacherId });
+    }
+    // Fallback: delete by course_code when teacher_id is null
+    return usersApi(token, { action: 'delete', courseCode });
+  },
 
-  // FIXED STUDENT PROFILE FETCH
+  // ── Admin: Delete Student (by student id) ─────────────────
+  async deleteStudent(token, studentId, userId) {
+    return usersApi(token, { action: 'delete', deleteType: 'student', studentId, userId });
+  },
+
+  // ── Password Reset ────────────────────────────────────────
+  async forgotPassword(email) {
+    const redirectUrl = `${window.location.origin}/reset-password`;
+    try {
+      const response = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
+        body: JSON.stringify({
+          email,
+          redirectTo: redirectUrl
+        })
+      });
+
+      const data = await response.json();
+
+      // Check for rate limiting
+      if (response.status === 429) {
+        return {
+          ok: false,
+          error: 'Too many password reset requests. Please wait 15-30 minutes before trying again, or check your email for a previous reset link.'
+        };
+      }
+
+      // Check both the response status and data for errors
+      if (!response.ok || data.error) {
+        return { ok: false, error: data.error?.message || data.message || 'Failed to send reset email' };
+      }
+
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  },
+
+  async resetPassword(email, token, password) {
+    // Supabase handles password reset via the recovery flow
+    return { ok: true, message: 'Use the link sent to your email' };
+  },
+
+  // ── Server Time (for QR sync) ─────────────────────────────
+  async getServerTime() {
+    return attApi('', { action: 'server-time' });
+  },
+
+  // ── Student Profile Fetch (FIXED: Restored original REST call) ─────────────
   async getStudentMe(token) {
     const user = getCurrentUser();
     if (!user.id) return null;
@@ -491,43 +622,116 @@ export const api = {
     return data[0] || null;
   },
 
-  async getDailyAttendance(token, date, className, section, courseCode) { return attApi(token, { action: 'get-daily', date, course_code: courseCode }); },
-  async getMonthlyAttendance(token, month, year, className, section, courseCode) { return attApi(token, { action: 'get-monthly', month, year, course_code: courseCode }); },
-  async finalizeAttendance(token, date, className, section, courseCode) { return attApi(token, { action: 'finalize', date, course_code: courseCode }); },
+  // ── Attendance: Daily ─────────────────────────────────────
+  async getDailyAttendance(token, date, className, section, courseCode) {
+    return attApi(token, { action: 'get-daily', date, course_code: courseCode });
+  },
 
+  // ── Attendance: Monthly ───────────────────────────────────
+  async getMonthlyAttendance(token, month, year, className, section, courseCode) {
+    return attApi(token, { action: 'get-monthly', month, year, course_code: courseCode });
+  },
+
+  // ── Attendance: Finalize ──────────────────────────────────
+  async finalizeAttendance(token, date, className, section, courseCode) {
+    return attApi(token, { action: 'finalize', date, course_code: courseCode });
+  },
+
+  // ── Attendance: Student Self-Mark ─────────────────────────
   async markMyAttendance(token, qrPayload) {
     const user = getCurrentUser();
+    // FIXED: Passes full edge function response back to UI to show successful scan time
     return attApi(token, { action: 'mark-self', qr_payload: qrPayload, student_user_id: user.id });
   },
 
+  // ── Export: Daily PDF ────────────
   async exportDailyPDF(token, date, className, section, courseCode) {
     const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+
     const students = data.students || [];
-    const rows = students.map((s, i) => [i + 1, s.roll_number, s.name, s.course_code, s.status, s.scan_time ? new Date(s.scan_time).toLocaleTimeString('en-IN') : '-']);
-    return await generatePDF(`Daily Report - ${date}`, ['S.No', 'Roll Number', 'Name', 'Course', 'Status', 'Scan Time'], rows);
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Course', 'Status', 'Scan Time'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.course_code,
+      s.status,
+      s.scan_time ? new Date(s.scan_time).toLocaleTimeString('en-IN') : '-'
+    ]);
+    const title = `Daily Attendance Report - ${date}`;
+    return await generatePDF(title, hdrs, rows);
   },
 
+  // ── Export: Daily CSV ─────────────────────────────────────
+  async exportDailyCSV(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+
+    const students = data.students || [];
+    const hdrs = ['S.No', 'Roll Number', 'Name', 'Course', 'Status', 'Scan Time'];
+    const rows = students.map((s, i) => [
+      i + 1,
+      s.roll_number,
+      s.name,
+      s.course_code,
+      s.status,
+      s.scan_time ? new Date(s.scan_time).toLocaleTimeString('en-IN') : '-'
+    ]);
+    return generateCSV(hdrs, rows);
+  },
+
+  // ── Export: Monthly PDF (FIXED: Improved ID and status mapping) ───────────
   async exportMonthlyPDF(token, month, year, className, section, courseCode) {
     const data = await attApi(token, { action: 'get-monthly', month, year, course_code: courseCode });
-    if (!data.ok) throw new Error('Failed to load data');
+    if (!data.ok) throw new Error('Failed to load monthly data');
+
     const students = data.students || [];
+    const courseName = data.course_name || courseCode;
+    const faculty = data.faculty || '[Faculty Name]';
     const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long' });
+
+    // Ensure IDs exist for map lookup
+    students.forEach(s => { if (!s.id) s.id = s.student_id || s.user_id; });
+
     const attendanceMap = {};
     students.forEach(student => {
-      const studentId = student.id || student.student_id || student.user_id;
-      if (!studentId) return;
-      attendanceMap[studentId] = {};
+      const sId = student.id;
+      if (!sId) return;
+      attendanceMap[sId] = {};
+
       const records = student.dailyRecords || student.daily || student.attendance_records || [];
       if (Array.isArray(records)) {
         records.forEach(rec => {
-          const dateParts = (rec.date || rec.created_at).split('T')[0].split('-');
-          const dayKey = dateParts[2]; // FIXED: Safe Day extraction
+          const dateStr = (rec.date || rec.created_at).split('T')[0];
+          const dayKey = dateStr.split('-')[2];
           const status = (rec.status || '').toLowerCase();
-          if (status === 'present' || status === 'p') attendanceMap[studentId][dayKey] = 'P';
-          else if (status === 'absent' || status === 'a') attendanceMap[studentId][dayKey] = 'A';
+          if (status === 'present' || status === 'p') attendanceMap[sId][dayKey] = 'P';
+          else if (status === 'absent' || status === 'a') attendanceMap[sId][dayKey] = 'A';
         });
       }
     });
-    return await generateMonthlyCalendarPDF('Monthly Report', courseCode, data.course_name || courseCode, monthName, year, students, attendanceMap, data.faculty || 'Faculty');
+
+    const title = `Monthly Attendance Report - ${monthName} ${year}`;
+    return await generateMonthlyCalendarPDF(title, courseCode, courseName, monthName, year, students, attendanceMap, faculty);
+  },
+
+  // ── Export: Monthly CSV ───────────────────────────────────
+  async exportMonthlyCSV(token, month, year, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-monthly', month, year, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load monthly data');
+    const students = data.students || [];
+    students.forEach(s => { if (!s.id) s.id = s.student_id || s.user_id; });
+    const rows = students.map((s, i) => [i + 1, s.roll_number, s.name, s.present, s.absent, s.percentage + '%']);
+    return generateCSV(['S.No', 'Roll Number', 'Name', 'Present', 'Absent', 'Percentage'], rows);
+  },
+
+  // ── Export: Legacy CSV ────────────────────────────────────
+  async exportAttendance(token, date, className, section, courseCode) {
+    const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
+    if (!data.ok) throw new Error('Failed to load attendance data');
+    const students = data.students || [];
+    const rows = students.map((s, i) => [i + 1, s.roll_number, s.name, s.course_code || courseCode, s.status, s.scan_time ? new Date(s.scan_time).toLocaleTimeString('en-IN') : '-']);
+    return generateCSV(['S.No', 'Roll Number', 'Name', 'Course', 'Status', 'Scan Time'], rows);
   }
 };
