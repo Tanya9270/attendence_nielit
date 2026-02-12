@@ -360,11 +360,11 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
         cellText = 'OFF';
         textColor = [150, 150, 150];
       } else if (attendanceStatus === 'P') {
-        cellText = '✓';
+        cellText = 'P';
         textColor = [45, 125, 50]; // Green
-        presentCount++;
+        // presentCount++;
       } else if (attendanceStatus === 'A') {
-        cellText = '✗';
+        cellText = 'A';
         textColor = [198, 40, 40]; // Red
       } else if (attendanceStatus === 'L') {
         cellText = 'L';
