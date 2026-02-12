@@ -353,20 +353,21 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
 
       const dayStr = day.toString().padStart(2, '0');
       const attendanceStatus = attendanceData[studentId]?.[dayStr];
+      const statusLower = String(attendanceStatus || '').toLowerCase();
       let cellText = '-';
       let textColor = [150, 150, 150];
 
       if (isWeekend) {
         cellText = 'OFF';
         textColor = [150, 150, 150];
-      } else if (attendanceStatus === 'P') {
+      } else if (statusLower === 'p' || attendanceStatus === 'P') {
         cellText = 'P';
         textColor = [45, 125, 50]; // Green
         // presentCount++;
-      } else if (attendanceStatus === 'A') {
+      } else if (statusLower === 'a' || attendanceStatus === 'A') {
         cellText = 'A';
         textColor = [198, 40, 40]; // Red
-      } else if (attendanceStatus === 'L') {
+      } else if (statusLower === 'l' || attendanceStatus === 'L') {
         cellText = 'L';
         textColor = [230, 81, 0]; // Orange
       }
