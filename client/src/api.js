@@ -607,6 +607,21 @@ export const api = {
     return attApi('', { action: 'server-time' });
   },
 
+  // ── Student Me ─────────────────────────────────────────────
+  async getStudentMe(token) {
+    const user = getCurrentUser();
+    if (!user.id) return null;
+    
+    // We call the Edge Function or the REST API to get student details
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/students?user_id=eq.${user.id}&select=*`, {
+      headers: headers(token)
+    });
+    
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data[0] || null;
+  },
+
   // ── Attendance: Daily ─────────────────────────────────────
   async getDailyAttendance(token, date, className, section, courseCode) {
     return attApi(token, { action: 'get-daily', date, course_code: courseCode });
@@ -696,7 +711,7 @@ export const api = {
           if (status === 'present' || status === 'p') {
               attendanceMap[studentId][dayKey] = 'P';
           } else if (status === 'absent' || status === 'a') {
-              attendanceMap[studentId][dayKey] = 'A';
+              attendanceMap[studentId][dayStr] = 'A';
           }
         });
       }
