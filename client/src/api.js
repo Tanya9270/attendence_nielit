@@ -32,6 +32,10 @@ async function usersApi(token, body) {
     body: JSON.stringify(body)
   });
   const data = await res.json();
+  // If response is an array, return it as-is with ok flag
+  if (Array.isArray(data)) {
+    return { ok: res.ok, data };
+  }
   return { ...data, ok: res.ok };
 }
 
@@ -368,8 +372,20 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
         textColor = [198, 40, 40]; // Red
       } else if (statusLower === 'l' || attendanceStatus === 'L') {
         cellText = 'L';
-        textColor = [230, 81, 0]; // Orange
-      }
+        textColor = [230, 81, 0]; // Orange      } else if (typeof attendanceStatus === 'object' && attendanceStatus !== null && attendanceStatus.status) {
+        // Handle object format with status and time
+        const status = attendanceStatus.status || '';
+        if (status === 'P' || status === 'p') {
+          cellText = 'P';
+          textColor = [45, 125, 50]; // Green
+          presentCount++;
+        } else if (status === 'A' || status === 'a') {
+          cellText = 'A';
+          textColor = [198, 40, 40]; // Red
+        } else if (status === 'L' || status === 'l') {
+          cellText = 'L';
+          textColor = [230, 81, 0]; // Orange
+        }      }
 
       doc.setTextColor(...textColor);
       doc.setFont(undefined, 'bold');
