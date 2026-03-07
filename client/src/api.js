@@ -370,9 +370,10 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
       } else if (attendanceStatus === 'A' || attendanceStatus === 'a') {
         cellText = 'A';
         textColor = [198, 40, 40]; // Red
-      } else if (statusLower === 'l' || attendanceStatus === 'L') {
+      } else if (attendanceStatus === 'L' || attendanceStatus === 'l') {
         cellText = 'L';
-        textColor = [230, 81, 0]; // Orange      } else if (typeof attendanceStatus === 'object' && attendanceStatus !== null && attendanceStatus.status) {
+        textColor = [230, 81, 0]; // Orange
+      } else if (typeof attendanceStatus === 'object' && attendanceStatus !== null && attendanceStatus.status) {
         // Handle object format with status and time
         const status = attendanceStatus.status || '';
         if (status === 'P' || status === 'p') {
@@ -385,7 +386,8 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
         } else if (status === 'L' || status === 'l') {
           cellText = 'L';
           textColor = [230, 81, 0]; // Orange
-        }      }
+        }
+      }
 
       doc.setTextColor(...textColor);
       doc.setFont(undefined, 'bold');
@@ -646,7 +648,79 @@ export const api = {
 
   // ── Attendance: Monthly ───────────────────────────────────
   async getMonthlyAttendance(token, month, year, className, section, courseCode) {
-    return attApi(token, { action: 'get-monthly', month, year, course_code: courseCode });
+    const data = await attApi(token, { action: 'get-monthly', month, year, course_code: courseCode });
+    if (!data.ok) return data;
+
+    const m = parseInt(month, 10);
+    const y = parseInt(year, 10);
+    const lastDay = new Date(y, m, 0).getDate();
+
+    // Build dailyInfo array for all days of the month
+    const dailyInfo = [];
+    for (let d = 1; d <= lastDay; d++) {
+      const dt = new Date(y, m - 1, d);
+      const dayOfWeek = dt.getDay();
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      // Check if any student has attendance on this day
+      const hasSession = (data.students || []).some(s =>
+        (s.dailyRecords || []).some(r => r.date === dateStr && r.status === 'present')
+      );
+      dailyInfo.push({
+        day: d,
+        dayName: dayNames[dayOfWeek],
+        isWeekend,
+        isHoliday: false,
+        hasSession,
+        date: dateStr
+      });
+    }
+
+    // Transform each student's dailyRecords into a per-day "daily" array 
+    const students = (data.students || []).map(s => {
+      // Build a lookup from date string to record
+      const recordMap = {};
+      (s.dailyRecords || []).forEach(r => {
+        recordMap[r.date] = r;
+      });
+
+      // Build daily array matching dailyInfo (one entry per day of month)
+      const daily = dailyInfo.map(di => {
+        const rec = recordMap[di.date];
+        if (di.isWeekend) {
+          return { day: di.day, status: 'weekend', scan_time: null };
+        }
+        if (rec) {
+          return { day: di.day, status: rec.status, scan_time: rec.scan_time };
+        }
+        return { day: di.day, status: '-', scan_time: null };
+      });
+
+      return {
+        ...s,
+        student_id: s.id,
+        daily,
+        leave: s.leave || 0
+      };
+    });
+
+    // Calculate overall stats
+    const totalPresent = students.reduce((sum, s) => sum + (s.present || 0), 0);
+    const totalStudents = students.length;
+    const workingDays = data.workingDays || 0;
+    const overallPercentage = totalStudents > 0 && workingDays > 0
+      ? Math.round((totalPresent / (totalStudents * workingDays)) * 100)
+      : 0;
+
+    return {
+      ...data,
+      students,
+      dailyInfo,
+      daysInMonth: lastDay,
+      totalStudents,
+      overallPercentage,
+    };
   },
 
   // ── Attendance: Finalize ──────────────────────────────────
