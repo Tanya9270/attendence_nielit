@@ -437,10 +437,7 @@ export default function StudentPortal() {
           console.log(`Day 10 Debug - dayData:`, dayData, 'isWeekend:', isWeekend);
         }
 
-        if (isWeekend) {
-          cellText = 'OFF';
-          textColor = [150, 150, 150];
-        } else if (dayData) {
+        if (dayData) {
           console.log(`Day ${day} has data - status: ${dayData.status}, comparing with 'P'`);
           if (dayData.status === 'P') {
             cellText = '✓';
@@ -462,6 +459,9 @@ export default function StudentPortal() {
             cellText = 'L';
             textColor = [230, 81, 0]; // Orange
           }
+        } else if (isWeekend) {
+          cellText = 'OFF';
+          textColor = [150, 150, 150];
         }
 
         doc.setTextColor(...textColor);
@@ -507,7 +507,7 @@ export default function StudentPortal() {
       doc.setFontSize(6);
       doc.setTextColor(150, 150, 150);
       doc.text(
-        `Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`,
+        `Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true })}`,
         margin,
         pageHeight - 5
       );

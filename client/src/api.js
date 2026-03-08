@@ -74,7 +74,7 @@ async function generatePDF(title, headersRow, rows) {
   // Add timestamp
   doc.setFontSize(10);
   doc.setFont(undefined, 'normal');
-  doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, margin, yPosition);
+  doc.text(`Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true })}`, margin, yPosition);
   yPosition += 8;
 
   // Calculate column widths
@@ -364,8 +364,18 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
       let textColor = [150, 150, 150];
 
       if (isWeekend) {
-        cellText = 'OFF';
-        textColor = [150, 150, 150];
+        // If attendance was marked on this weekend, show it
+        if (attendanceStatus === 'P' || attendanceStatus === 'p') {
+          cellText = 'P';
+          textColor = [45, 125, 50];
+          presentCount++;
+        } else if (attendanceStatus === 'A' || attendanceStatus === 'a') {
+          cellText = 'A';
+          textColor = [198, 40, 40];
+        } else {
+          cellText = 'OFF';
+          textColor = [150, 150, 150];
+        }
       } else if (attendanceStatus === 'P' || attendanceStatus === 'p') {
         cellText = 'P';
         textColor = [45, 125, 50]; // Green
@@ -437,7 +447,7 @@ async function generateMonthlyCalendarPDF(title, courseCode, courseName, monthNa
   doc.setFontSize(6);
   doc.setTextColor(150, 150, 150);
   doc.text(
-    `Generated on: ${new Date().toLocaleString('en-IN')}`,
+    `Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true })}`,
     margin,
     pageHeight - 3
   );
@@ -644,6 +654,24 @@ export const api = {
     return data[0] || null;
   },
 
+  // ── Student Attendance Stats (by month) ────────────────────
+  async getStudentAttendanceStatsByMonth(token, month, year) {
+    const user = getCurrentUser();
+    const data = await attApi(token, { action: 'student-stats', user_id: user.id, month, year });
+    if (!data.ok) return data;
+    const leave = (data.recentAttendance || []).filter(r => r.status === 'leave').length;
+    return {
+      ...data,
+      stats: {
+        presentDays: data.stats?.present || 0,
+        absentDays: data.stats?.absent || 0,
+        leaveDays: leave,
+        totalWorkingDays: data.stats?.workingDays || 0,
+        percentage: data.stats?.percentage || 0,
+      },
+    };
+  },
+
   // ── Attendance: Daily ─────────────────────────────────────
   async getDailyAttendance(token, date, className, section, courseCode) {
     return attApi(token, { action: 'get-daily', date, course_code: courseCode });
@@ -755,7 +783,7 @@ export const api = {
       s.name,
       s.course_code,
       s.status,
-      s.scan_time ? new Date(s.scan_time).toLocaleTimeString('en-IN') : '-'
+      s.scan_time ? new Date(s.scan_time).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : '-'
     ]);
     const title = `Daily Attendance Report - ${date}`;
     return await generatePDF(title, hdrs, rows);
@@ -774,7 +802,7 @@ export const api = {
       s.name,
       s.course_code,
       s.status,
-      s.scan_time ? new Date(s.scan_time).toLocaleTimeString('en-IN') : '-'
+      s.scan_time ? new Date(s.scan_time).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : '-'
     ]);
     return generateCSV(hdrs, rows);
   },
@@ -830,7 +858,7 @@ export const api = {
     const data = await attApi(token, { action: 'get-daily', date, course_code: courseCode });
     if (!data.ok) throw new Error('Failed to load attendance data');
     const students = data.students || [];
-    const rows = students.map((s, i) => [i + 1, s.roll_number, s.name, s.course_code || courseCode, s.status, s.scan_time ? new Date(s.scan_time).toLocaleTimeString('en-IN') : '-']);
+    const rows = students.map((s, i) => [i + 1, s.roll_number, s.name, s.course_code || courseCode, s.status, s.scan_time ? new Date(s.scan_time).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : '-']);
     return generateCSV(['S.No', 'Roll Number', 'Name', 'Course', 'Status', 'Scan Time'], rows);
   }
 };

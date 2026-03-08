@@ -12,6 +12,14 @@ function respond(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
 }
 
+// IST helpers: Supabase edge functions run in UTC, convert to IST (UTC+5:30)
+function getISTDate(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
+function getISTTimestamp(): string {
+  return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Kolkata' }).replace(' ', 'T');
+}
+
 // Helper: find student record by auth user UUID
 // Since students.user_id is INTEGER and auth IDs are UUIDs,
 // we look up the auth user's metadata to get roll_number, then query by that.
@@ -105,7 +113,7 @@ serve(async (req) => {
     // ── MARK ATTENDANCE (teacher scans student QR) ──────────
     if (action === "mark-attendance") {
       const { roll_number, course_code, scanner_id, date } = body;
-      const today = date || new Date().toISOString().split("T")[0];
+      const today = date || getISTDate();
 
       // Find student
       const { data: student } = await supabase
@@ -136,7 +144,7 @@ serve(async (req) => {
         student_id: student.id,
         date: today,
         status: "present",
-        scan_time: new Date().toISOString(),
+        scan_time: getISTTimestamp(),
         scanner_id: scanner_id || null,
         finalized: false,
       });
@@ -183,7 +191,7 @@ serve(async (req) => {
         return respond({ ok: false, error: "course_mismatch" });
       }
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = getISTDate();
 
       // Check duplicate
       const { data: existing } = await supabase
@@ -198,7 +206,7 @@ serve(async (req) => {
       }
 
       const attId = `${student.id}-${today}`;
-      const scanTime = new Date().toISOString();
+      const scanTime = getISTTimestamp();
       const { error } = await supabase.from("attendance").insert({
         id: attId,
         student_id: student.id,
@@ -217,7 +225,7 @@ serve(async (req) => {
     // ── GET DAILY ATTENDANCE ────────────────────────────────
     if (action === "get-daily") {
       const { date, course_code } = body;
-      const today = date || new Date().toISOString().split("T")[0];
+      const today = date || getISTDate();
 
       // Get all students for this course
       let studentsQuery = supabase.from("students").select("*");
@@ -399,7 +407,7 @@ serve(async (req) => {
     // ── FINALIZE ATTENDANCE ─────────────────────────────────
     if (action === "finalize") {
       const { date, course_code } = body;
-      const today = date || new Date().toISOString().split("T")[0];
+      const today = date || getISTDate();
 
       let query = supabase.from("attendance").update({ finalized: true }).eq("date", today);
 

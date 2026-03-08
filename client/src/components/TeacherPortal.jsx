@@ -9,7 +9,7 @@ import AdminPanel from './AdminPanel';
 export default function TeacherPortal() {
   const [activeTab, setActiveTab] = useState('qr');
   const [attendance, setAttendance] = useState([]);
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }));
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [finalized, setFinalized] = useState(false);
@@ -1045,7 +1045,7 @@ export default function TeacherPortal() {
                                       <span style={{ color: '#8DC63F', fontSize: '14px' }}>✓</span>
                                       {d.scan_time && (
                                         <div style={{ fontSize: '9px', color: '#666' }}>
-                                          {new Date(d.scan_time).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false })}
+                                          {new Date(d.scan_time).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true })}
                                         </div>
                                       )}
                                     </div>
