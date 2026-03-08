@@ -188,19 +188,28 @@ export default function StudentPortal() {
         } catch (e) {}
       } else {
         let errorText = 'Failed to mark attendance';
-        if (response.reason === 'timestamp_out_of_range') {
+        // Check both backend error and reason fields
+        const errorType = response.error || response.reason || '';
+        
+        if (errorType === 'qr_expired' || response.reason === 'timestamp_out_of_range') {
           errorText = `QR code expired (${response.delta_seconds}s old). Please scan a fresh QR code.`;
-        } else if (response.reason === 'already_marked' || response.message === 'already_marked') {
+        } else if (response.message === 'already_marked' || errorType === 'already_marked') {
           errorText = 'Your attendance is already marked for today!';
           setAttendanceMarked(true);
-          // Set the scan time from existing attendance record
           if (response.scan_time) {
             setScanTime(new Date(response.scan_time));
           }
-        } else if (response.reason === 'already_finalized') {
+        } else if (errorType === 'already_finalized' || response.reason === 'already_finalized') {
           errorText = 'Attendance has been finalized for today.';
-        } else if (response.reason === 'invalid_qr_format') {
+        } else if (errorType === 'invalid_qr' || response.reason === 'invalid_qr_format') {
           errorText = 'Invalid QR code. Please scan the teacher\'s attendance QR.';
+        } else if (errorType === 'student_not_found') {
+          errorText = 'Student record not found. Please contact your administrator.';
+        } else if (errorType === 'course_mismatch') {
+          errorText = 'You are not enrolled in the teacher\'s course.';
+        } else if (response.error) {
+          // Show the actual error from backend if we don't have a specific handler
+          errorText = `Error: ${response.error}`;
         }
 
         setMessage({ type: 'error', text: errorText });
