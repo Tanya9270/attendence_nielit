@@ -325,17 +325,23 @@ serve(async (req) => {
         attMap[r.student_id][r.date] = r;
       });
 
-      // Calculate working days (exclude weekends)
-      let workingDays = 0;
+      // Determine session days: dates where at least one student was marked present
+      const sessionDates = new Set<string>();
+      (records || []).forEach((r: any) => {
+        if (r.status === "present") sessionDates.add(r.date);
+      });
+
+      // Calculate all weekdays
       const allDates: string[] = [];
       for (let d = 1; d <= lastDay; d++) {
         const dt = new Date(y, m - 1, d);
         const day = dt.getDay();
         if (day !== 0 && day !== 6) {
-          workingDays++;
           allDates.push(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
         }
       }
+
+      const sessionDayCount = sessionDates.size;
 
       const result = students.map((s: any) => {
         const studentAtt = attMap[s.id] || {};
@@ -347,13 +353,17 @@ serve(async (req) => {
           if (rec && rec.status === "present") {
             present++;
             return { date: dt, status: "present", scan_time: rec.scan_time };
-          } else {
+          } else if (sessionDates.has(dt)) {
+            // Session day but student not present
             absent++;
             return { date: dt, status: "absent", scan_time: null };
+          } else {
+            // No session this day - leave empty
+            return { date: dt, status: "-", scan_time: null };
           }
         });
 
-        const percentage = workingDays > 0 ? Math.round((present / workingDays) * 100) : 0;
+        const percentage = sessionDayCount > 0 ? Math.round((present / sessionDayCount) * 100) : 0;
 
         return {
           id: s.id,
@@ -370,7 +380,7 @@ serve(async (req) => {
       return respond({
         ok: true,
         students: result,
-        workingDays,
+        workingDays: sessionDayCount,
         month: m,
         year: y,
         monthName: new Date(y, m - 1).toLocaleString("en-US", { month: "long" }),
@@ -444,15 +454,28 @@ serve(async (req) => {
       const lastDay = new Date(y, m, 0).getDate();
       const endDate = `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-      // Working days
-      let workingDays = 0;
-      for (let d = 1; d <= lastDay; d++) {
-        const dt = new Date(y, m - 1, d);
-        const day = dt.getDay();
-        if (day !== 0 && day !== 6) workingDays++;
-      }
+      // Get all students in same course to determine session days
+      const { data: courseStudents } = await supabase
+        .from("students")
+        .select("id")
+        .eq("course_code", student.course_code);
+      const courseStudentIds = (courseStudents || []).map((s: any) => s.id);
 
-      // Get attendance records
+      // Get all attendance for the course this month to find session days
+      const { data: allCourseRecords } = await supabase
+        .from("attendance")
+        .select("student_id, date, status")
+        .gte("date", startDate)
+        .lte("date", endDate)
+        .in("student_id", courseStudentIds);
+
+      const sessionDates = new Set<string>();
+      (allCourseRecords || []).forEach((r: any) => {
+        if (r.status === "present") sessionDates.add(r.date);
+      });
+      const sessionDayCount = sessionDates.size;
+
+      // Get this student's attendance records
       const { data: records } = await supabase
         .from("attendance")
         .select("*")
@@ -462,12 +485,12 @@ serve(async (req) => {
         .order("date", { ascending: true });
 
       const present = (records || []).filter((r: any) => r.status === "present").length;
-      const absent = workingDays - present;
-      const percentage = workingDays > 0 ? Math.round((present / workingDays) * 100) : 0;
+      const absent = sessionDayCount - present;
+      const percentage = sessionDayCount > 0 ? Math.round((present / sessionDayCount) * 100) : 0;
 
       return respond({
         ok: true,
-        stats: { workingDays, present, absent, percentage },
+        stats: { workingDays: sessionDayCount, present, absent, percentage },
         recentAttendance: (records || []).map((r: any) => ({
           date: r.date,
           status: r.status,
@@ -495,6 +518,6 @@ serve(async (req) => {
     return respond({ ok: false, error: "unknown_action" }, 400);
   } catch (err: any) {
     console.error("attendance-api error:", err);
-    return respond({ ok: false, error: err.message }, 200);
+    return respond({ ok: false, error: err.message }, 500);
   }
 });

@@ -13,7 +13,7 @@ const edgeFn = (token) => ({
   'x-mark-fn-api-key': MARK_FN_KEY
 });
 
-// Helper: call the attendance-api edge function (STRICT FIX: Now returns .ok for UI logic)
+// Helper: call the attendance-api edge function
 async function attApi(token, body) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/attendance-api`, {
     method: 'POST',
@@ -21,10 +21,12 @@ async function attApi(token, body) {
     body: JSON.stringify(body)
   });
   const data = await res.json();
-  return { ...data, ok: res.ok };
+  // Use backend's ok field if present; only fall back to HTTP status
+  if (!res.ok) return { ...data, ok: false };
+  return data;
 }
 
-// Helper: call the manage-users edge function (STRICT FIX: Now returns .ok for UI logic)
+// Helper: call the manage-users edge function
 async function usersApi(token, body) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
     method: 'POST',
@@ -36,7 +38,8 @@ async function usersApi(token, body) {
   if (Array.isArray(data)) {
     return { ok: res.ok, data };
   }
-  return { ...data, ok: res.ok };
+  if (!res.ok) return { ...data, ok: false };
+  return data;
 }
 
 // Helper: get current user from localStorage
