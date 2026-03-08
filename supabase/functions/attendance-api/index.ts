@@ -318,17 +318,20 @@ serve(async (req) => {
         .lte("date", endDate)
         .in("student_id", studentIds);
 
+      // Normalize date: Supabase may return "2026-03-09T00:00:00+00:00" instead of "2026-03-09"
+      const dateOnly = (d: string) => (d || "").split("T")[0];
+
       // Build attendance map: studentId -> { date -> record }
       const attMap: Record<number, Record<string, any>> = {};
       (records || []).forEach((r: any) => {
         if (!attMap[r.student_id]) attMap[r.student_id] = {};
-        attMap[r.student_id][r.date] = r;
+        attMap[r.student_id][dateOnly(r.date)] = r;
       });
 
       // Determine session days: dates where at least one student was marked present
       const sessionDates = new Set<string>();
       (records || []).forEach((r: any) => {
-        if (r.status === "present") sessionDates.add(r.date);
+        if (r.status === "present") sessionDates.add(dateOnly(r.date));
       });
 
       // Calculate all weekdays
@@ -469,9 +472,10 @@ serve(async (req) => {
         .lte("date", endDate)
         .in("student_id", courseStudentIds);
 
+      const dateOnly = (d: string) => (d || "").split("T")[0];
       const sessionDates = new Set<string>();
       (allCourseRecords || []).forEach((r: any) => {
-        if (r.status === "present") sessionDates.add(r.date);
+        if (r.status === "present") sessionDates.add(dateOnly(r.date));
       });
       const sessionDayCount = sessionDates.size;
 
