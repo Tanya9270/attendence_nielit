@@ -7,6 +7,22 @@
 [build.environment]
   NPM_CONFIG_PRODUCTION = "false"
 
+# Ensure hashed assets are cached, but index.html always re-fetches
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "no-cache"
+
 [context.production.environment]
   NODE_ENV = "production"
   VITE_SUPABASE_URL = "https://pxdvfzwzoviwiwhezzjd.supabase.co"

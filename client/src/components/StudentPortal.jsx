@@ -234,7 +234,7 @@ export default function StudentPortal() {
       new Date(record.date).toLocaleDateString('en-IN', { weekday: 'short' }),
       record.status,
       record.scan_time
-        ? new Date(record.scan_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+        ? new Date(record.scan_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
         : '-'
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -1054,7 +1054,8 @@ export default function StudentPortal() {
                                         hour: '2-digit',
                                         minute: '2-digit',
                                         second: '2-digit',
-                                        hour12: true
+                                        hour12: true,
+                                        timeZone: 'Asia/Kolkata'
                                       })
                                     : '-'
                                   }
