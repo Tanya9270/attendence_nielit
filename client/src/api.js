@@ -691,6 +691,10 @@ export const api = {
       // Build daily array matching dailyInfo (one entry per day of month)
       const daily = dailyInfo.map(di => {
         const rec = recordMap[di.date];
+        if (rec && rec.status !== '-' && rec.status !== 'weekend') {
+          // Actual attendance record exists (present/absent) — show it even on weekends
+          return { day: di.day, status: rec.status, scan_time: rec.scan_time };
+        }
         if (di.isWeekend) {
           return { day: di.day, status: 'weekend', scan_time: null };
         }

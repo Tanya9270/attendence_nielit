@@ -334,14 +334,10 @@ serve(async (req) => {
         if (r.status === "present") sessionDates.add(dateOnly(r.date));
       });
 
-      // Calculate all weekdays
+      // Build allDates: ALL days of the month (dailyRecords covers every day for the calendar)
       const allDates: string[] = [];
       for (let d = 1; d <= lastDay; d++) {
-        const dt = new Date(y, m - 1, d);
-        const day = dt.getDay();
-        if (day !== 0 && day !== 6) {
-          allDates.push(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
-        }
+        allDates.push(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
       }
 
       const sessionDayCount = sessionDates.size;
@@ -352,7 +348,11 @@ serve(async (req) => {
         let absent = 0;
 
         const dailyRecords = allDates.map((dt) => {
+          const dtDate = new Date(`${dt}T00:00:00`);
+          const dayOfWeek = dtDate.getDay();
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
           const rec = studentAtt[dt];
+
           if (rec && rec.status === "present") {
             present++;
             return { date: dt, status: "present", scan_time: rec.scan_time };
@@ -360,6 +360,8 @@ serve(async (req) => {
             // Session day but student not present
             absent++;
             return { date: dt, status: "absent", scan_time: null };
+          } else if (isWeekend) {
+            return { date: dt, status: "weekend", scan_time: null };
           } else {
             // No session this day - leave empty
             return { date: dt, status: "-", scan_time: null };
