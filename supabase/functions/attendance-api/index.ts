@@ -21,20 +21,30 @@ function getISTTimestamp(): string {
 }
 
 // Helper: find student record by auth user UUID
-// Since students.user_id is INTEGER and auth IDs are UUIDs,
-// we look up the auth user's metadata to get roll_number, then query by that.
-// Fallback: if metadata is missing, check profiles for role=student and try name match.
+// First check the user_id column directly, then fall back to metadata lookups
 async function findStudentByAuthId(supabase: any, authUserId: string) {
+  // Direct lookup: students.user_id stores the auth UUID
+  const { data: directMatch } = await supabase
+    .from("students")
+    .select("*")
+    .eq("user_id", authUserId)
+    .maybeSingle();
+  if (directMatch) return directMatch;
+
+  // Fallback: look up roll_number from auth user metadata
   const { data: authUser } = await supabase.auth.admin.getUserById(authUserId);
   const meta = authUser?.user?.user_metadata;
   const rollNumber = meta?.roll_number;
+  const courseCode = meta?.course_code;
 
   if (rollNumber) {
-    const { data: student } = await supabase
+    // Use course_code to disambiguate duplicate roll numbers
+    let query = supabase
       .from("students")
       .select("*")
-      .eq("roll_number", rollNumber)
-      .maybeSingle();
+      .eq("roll_number", rollNumber);
+    if (courseCode) query = query.eq("course_code", courseCode);
+    const { data: student } = await query.maybeSingle();
     if (student) return student;
   }
 
